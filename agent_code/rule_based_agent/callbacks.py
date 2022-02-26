@@ -67,7 +67,7 @@ def setup(self):
     """
     self.logger.debug('Successfully entered setup code')
     np.random.seed()
-    # Fixed length FIFO queues to avoid repeating the same actions
+    # Fixed length FIFO (first-in-first-out) queues to avoid repeating the same actions
     self.bomb_history = deque([], 5)
     self.coordinate_history = deque([], 20)
     # While this timer is positive, agent will not hunt/attack opponents
@@ -97,7 +97,7 @@ def act(self, game_state):
         self.current_round = game_state["round"]
     # Gather information about the game state
     arena = game_state['field']
-    _, score, bombs_left, (x, y) = game_state['self']
+    _, score, bombs_left, (x, y) = game_state['self'] # ignoring the name with "_"
     bombs = game_state['bombs']
     bomb_xys = [xy for (xy, t) in bombs]
     others = [xy for (n, s, b, xy) in game_state['others']]

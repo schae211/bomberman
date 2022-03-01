@@ -136,8 +136,8 @@ def state_to_features(game_state: dict) -> np.array:
         self_map[game_state["self"][3]] = 1
 
         # create channels based on the field and coin information.
-        # channels = [self_map, game_state["field"], coin_map]
-        channels = [self_map, coin_map]
+        channels = [self_map, game_state["field"], coin_map]
+        # channels = [self_map, coin_map]
         # concatenate them as a feature tensor (they must have the same shape), ...
         stacked_channels = np.stack(channels)
         # and return them as a vector

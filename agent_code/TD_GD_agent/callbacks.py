@@ -9,6 +9,22 @@ from sklearn.multioutput import MultiOutputRegressor
 from lightgbm import LGBMRegressor
 
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
+ACTION_TRANSLATE = {
+    "UP": 0,
+    "RIGHT": 1,
+    "DOWN": 2,
+    "LEFT": 3,
+    "WAIT": 4,
+    "BOMB": 5
+}
+ACTION_TRANSLATE_REV = {
+    0: "UP",
+    1: "RIGHT",
+    2: "DOWN",
+    3: "LEFT",
+    4: "WAIT",
+    5: "BOMB"
+}
 
 # TODO: Bombs are disabled
 DEFAULT_PROBS = [.225, .225, .225, .225, .1, .0]
@@ -16,6 +32,8 @@ DEFAULT_PROBS = [.225, .225, .225, .225, .1, .0]
 # Setting up the hyper parameters (is it ok to put the here?
 # starting with a simple espilon greedy strategy
 EPSILON = 0.1
+
+POLICY = "deterministic"
 
 # for later usage to reduce exploration over time, for simplicity we will start with epsilon-greedy strategy
 # EXPLORATION_MAX = 1.0
@@ -42,10 +60,7 @@ def setup(self):
     """
     if self.train or not os.path.isfile("my-saved-model.pt"):
         self.logger.info("Setting up model from scratch.")
-        # random initialization of the weight with uniform [0,1)
-        # weights = np.random.rand(len(ACTIONS))
-        # normalize the probabilities to get sum = 1
-        # self.model = weights / weights.sum()
+        # n_jobs=-1 means that all CPUs are used.
         self.model = MultiOutputRegressor(LGBMRegressor(n_estimators=100, n_jobs=-1))
     else:
         self.logger.info("Loading model from saved state.")
@@ -76,7 +91,7 @@ def act(self, game_state: dict) -> str:
         return np.random.choice(ACTIONS, p=DEFAULT_PROBS)
 
     if self.isFit:
-        self.logger.debug("Querying model for action.")
+        self.logger.debug("Querying fitted model for action.")
 
         # array.reshape(1, -1) if it contains a single sample for MultiOutputRegressor
         features = state_to_features(game_state).reshape(1, -1)
@@ -84,16 +99,23 @@ def act(self, game_state: dict) -> str:
         # compute q-values using our fitted model, important to flatten the output again
         q_values = self.model.predict(features).reshape(-1)
 
-        # normalize the q_values, take care not to divide by zero (fall back to default probs)
-        if all(q_values == 0):
-            probs = (q_values-q_values.min()) / (q_values.max()-q_values.min())  # min-max scaling
-            probs = probs / probs.sum()  # normalization
-        else:
-            self.logger.debug("Choosing action at random because q-values are all 0")
-            probs = DEFAULT_PROBS
+        if POLICY == "deterministic":
+            self.logger.debug(f"{q_values=}")
+            self.logger.debug(f"{np.argmax(q_values)=}")
+            return ACTION_TRANSLATE_REV[np.argmax(q_values)]
+        elif POLICY == "stochastic":
 
-        # using a stochastic policy!
-        return np.random.choice(ACTIONS, p=probs)
+            # normalize the q_values, take care not to divide by zero (fall back to default probs)
+            if any(q_values != 0):
+                probs = (q_values-q_values.min()) / (q_values.max()-q_values.min())  # min-max scaling
+                probs = probs / probs.sum()  # normalization
+            else:
+                self.logger.debug("Choosing action at random because q-values are all 0")
+                probs = DEFAULT_PROBS
+
+            # using a stochastic policy!
+            #return np.random.choice(ACTIONS, p=probs)
+
     # if we have not yet fit the model return random action
     else:
         return np.random.choice(ACTIONS, p=DEFAULT_PROBS)
@@ -121,6 +143,7 @@ def state_to_features(game_state: dict) -> np.array:
     # with open("/Users/philipp/game_dict.pt", "wb") as file: pickle.dump(game_state, file)
     # with open("/Users/philipp/game_dict.pt", "rb") as file: game_dict = pickle.load(file)
 
+    # define different options for creating the features
     option = 0
 
     if option == 0:
@@ -130,12 +153,13 @@ def state_to_features(game_state: dict) -> np.array:
         for cx, cy in game_state["coins"]:
             coin_map[cx, cy] = 1
 
+        # also adding where one self is on the map
         self_map = np.zeros(game_state["field"].shape)
         self_map[game_state["self"][3]] = 1
 
         # create channels based on the field and coin information.
         channels = [self_map, game_state["field"], coin_map]
-        # channels = [self_map, coin_map]
+
         # concatenate them as a feature tensor (they must have the same shape), ...
         stacked_channels = np.stack(channels)
         # and return them as a vector

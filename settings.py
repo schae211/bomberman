@@ -3,13 +3,19 @@ from pathlib import Path
 
 from fallbacks import pygame
 
-# Game properties
-COLS = 17
-ROWS = 17
+# Original Game properties
+# COLS = 17
+# ROWS = 17
+
+# Simplification to check whether the training works
+COLS = 7
+ROWS = 7
+
 SCENARIOS = {
     "coin-heaven": {
         "CRATE_DENSITY": 0,
-        "COIN_COUNT": 50
+        "COIN_COUNT": 5
+        # "COIN_COUNT": 50
     },
     # This is the tournament game mode
     "classic": {

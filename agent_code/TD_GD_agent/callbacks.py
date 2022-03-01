@@ -72,26 +72,24 @@ def act(self, game_state: dict) -> str:
 
     # only do exploration if we train, no random moves in tournament
     if self.train and np.random.rand() < EPSILON:
-        self.logger.debug("Choosing action purely at random.")
-        # 80%: walk in any direction. 10% wait. 10% bomb (are these good initialization?)
+        self.logger.debug("Choosing action at random due to epsilon-greedy policy")
         return np.random.choice(ACTIONS, p=DEFAULT_PROBS)
+
     if self.isFit:
         self.logger.debug("Querying model for action.")
-        # or array.reshape(1, -1) if it contains a single sample
+
+        # array.reshape(1, -1) if it contains a single sample for MultiOutputRegressor
         features = state_to_features(game_state).reshape(1, -1)
-        self.logger.debug(f"Shape of the features: {features.shape}")
 
         # compute q-values using our fitted model, important to flatten the output again
         q_values = self.model.predict(features).reshape(-1)
-        self.logger.debug(f"Shape of the predicted q-values: {q_values.shape}")
-
-        # get probabilities from the q_values
 
         # normalize the q_values, take care not to divide by zero (fall back to default probs)
-        if q_values.sum() != 0:
+        if all(q_values == 0):
             probs = (q_values-q_values.min()) / (q_values.max()-q_values.min())  # min-max scaling
             probs = probs / probs.sum()  # normalization
         else:
+            self.logger.debug("Choosing action at random because q-values are all 0")
             probs = DEFAULT_PROBS
 
         # using a stochastic policy!

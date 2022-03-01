@@ -104,18 +104,21 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     """
     # info that episode is over
     self.logger.debug(f'Encountered event(s) {", ".join(map(repr, events))} in final step')
+    # also adding the last state to the memory (which we are not using anyway)
+    self.memory.append(Transition(state_to_features(last_game_state), last_action, None,
+                                  reward_from_events(self, events, last_game_state)))
 
     # Train the model
     self.logger.debug(f"Starting to train the model (has it been fit before={self.isFit})\n")
 
-    # initialize our X and y which we use for fitting
+    # initialize our X and y which we use for fitting later on
     x = []
     y = []
 
     # extract information from each transition tuple (as stored above)
     for state, action, state_next, reward in self.memory:
 
-        # I think I cannot use these for training
+        # Apparently, I cannot use the first and last state for training
         if state is None or state_next is None:
             continue
 
@@ -125,25 +128,20 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         # if we have fit the model before q-update is the following
         if self.isFit:
 
-            # compute q update according to the formula from the lecture, also don't forget to reshape here for single instance
+            # compute q update according to the formula from the lecture
+            # also don't forget to reshape here for single instance
             q_update = (reward + GAMMA * np.max(self.model.predict(state_next.reshape(1, -1))))
 
-        # if we haven't fit the model before the q-update is only the reward
+            # use model to predict the q-values for the current state (again don't forget to reshape)
+            q_values = self.model.predict(state.reshape(1, -1)).reshape(-1)
+
+        # if we haven't fit the model before the q-update is only the reward, and we set the q_values to 0
         else:
             q_update = reward
-
-        # if we have fit the model before we predict the q-values, otherwise simply 0
-        if self.isFit:
-            # again don't forget to reshape
-            q_values = self.model.predict(state.reshape(1, -1)).reshape(-1)
-        else:
             q_values = np.zeros(len(ACTIONS))
 
-        # for the action that we actually took update the q-value
+        # for the action that we actually took update the q-value to the
         q_values[action] = q_update
-
-        # check
-        self.logger.debug(f"Shape of the q_values[0]: {q_values}")
 
         # appending the state to our X list
         # reshaping needed according to sklearn/utils/validation.py
@@ -155,7 +153,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     # fitting the model and setting isFit to true
     # importantly partial fitting is not possible with most methods except for NN (so we fit again to the whole TS)
     # if y has the right size here (len = 6) everything should be fine
-    self.logger.debug(f"Trying to fit the model:")
+    self.logger.debug(f"Fitting the model using the input as specified below:")
 
     # reshape our predictors and checking the shape
     x_reshaped = np.stack(x, axis=0)
@@ -164,12 +162,6 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     self.logger.debug(f"Shape y_reshape: {y_reshaped.shape}")
     self.model.fit(x_reshaped, y_reshaped)
     self.isFit = True
-
-    # TODO: reducing the exploration rate over time to optimize the exploration-exploitation tradeoff.
-
-    # should execute this code chunk before or after training?
-    # initially I though that missing the next state makes my training impossible
-    self.memory.append(Transition(state_to_features(last_game_state), last_action, None, reward_from_events(self, events, last_game_state)))
 
     # Store the current model
     with open("my-saved-model.pt", "wb") as file:

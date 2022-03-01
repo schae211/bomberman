@@ -1,0 +1,3 @@
+
+Details:
+- This agent is going to be trained using temporal difference Q-learning using Gradient Boosted Trees

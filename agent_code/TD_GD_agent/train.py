@@ -29,8 +29,8 @@ GAMMA = 0.95
 # learning rate alpha
 LEARNING_RATE = 0.001
 
-# memory size "experience buffer"
-MEMORY_SIZE = 20
+# memory size "experience buffer", if I fit the model only after each episode a large memory size should be fine
+MEMORY_SIZE = 200
 
 # min size before starting to train? Should I implement this?
 #BATCH_SIZE = 20
@@ -83,7 +83,7 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
     self.memory.append(Transition(state_to_features(old_game_state),    # state
                                   self_action,                          # action
                                   state_to_features(new_game_state),    # next_state
-                                  reward_from_events(self, events)))    # reward
+                                  reward_from_events(self, events, old_game_state)))    # reward
 
     # Idea: Add your own events to hand out rewards
     #if ...:
@@ -121,7 +121,6 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
         # translate action to int
         action = ACTION_TRANSLATE[action]
-        self.logger.debug(f"Translated action: {action}")
 
         # if we have fit the model before q-update is the following
         if self.isFit:
@@ -129,7 +128,6 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
             # compute q update according to the formula from the lecture, also don't forget to reshape here for single instance
             q_update = (reward + GAMMA * np.max(self.model.predict(state_next.reshape(1, -1))))
 
-            self.logger.debug(f"Model has been fit before, computing proper q-update: {q_update}")
         # if we haven't fit the model before the q-update is only the reward
         else:
             q_update = reward
@@ -138,7 +136,6 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         if self.isFit:
             # again don't forget to reshape
             q_values = self.model.predict(state.reshape(1, -1)).reshape(-1)
-            self.logger.debug(f"Model has been fit before, predicting q-values from current model: {q_values}")
         else:
             q_values = np.zeros(len(ACTIONS))
 
@@ -159,10 +156,8 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     # importantly partial fitting is not possible with most methods except for NN (so we fit again to the whole TS)
     # if y has the right size here (len = 6) everything should be fine
     self.logger.debug(f"Trying to fit the model:")
-    # checking the shape
-    self.logger.debug(f"x shapes: {[elem.shape for elem in x]}")
-    self.logger.debug(f"y shapes: {[elem.shape for elem in y]}")
-    # reshape our predictors
+
+    # reshape our predictors and checking the shape
     x_reshaped = np.stack(x, axis=0)
     y_reshaped = np.stack(y, axis=0)
     self.logger.debug(f"Shape x_reshape: {x_reshaped.shape}")
@@ -174,7 +169,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
     # should execute this code chunk before or after training?
     # initially I though that missing the next state makes my training impossible
-    self.memory.append(Transition(state_to_features(last_game_state), last_action, None, reward_from_events(self, events)))
+    self.memory.append(Transition(state_to_features(last_game_state), last_action, None, reward_from_events(self, events, last_game_state)))
 
     # Store the current model
     with open("my-saved-model.pt", "wb") as file:
@@ -182,12 +177,18 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
 
 # this is where we are going to specify the rewards for certain actions
-def reward_from_events(self, events: List[str]) -> int:
+def reward_from_events(self, events: List[str], game_state) -> int:
     """
     Computing the rewards for our agent in a given step
     """
+    # for the first step nothing is returned
+    if game_state is None:
+        game_state = {"step": 0}
+
     game_rewards = {
-        e.COIN_COLLECTED: 1
+        e.COIN_COLLECTED: 5 * 0.99**game_state["step"],  # discount the reward for collecting coints over time
+        e.KILLED_SELF: -10,
+        e.INVALID_ACTION: -1
         # for now, I will keep it simply and only use one reward for collecting coins!
         #e.KILLED_OPPONENT: 5,
         #PLACEHOLDER_EVENT: -.1  # idea: the custom event is bad

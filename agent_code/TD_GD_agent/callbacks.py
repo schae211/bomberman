@@ -10,6 +10,9 @@ from lightgbm import LGBMRegressor
 
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 
+# TODO: Bombs are disabled
+DEFAULT_PROBS = [.225, .225, .225, .225, .1, .0]
+
 # Setting up the hyper parameters (is it ok to put the here?
 # starting with a simple espilon greedy strategy
 EPSILON = 0.1
@@ -71,7 +74,7 @@ def act(self, game_state: dict) -> str:
     if self.train and np.random.rand() < EPSILON:
         self.logger.debug("Choosing action purely at random.")
         # 80%: walk in any direction. 10% wait. 10% bomb (are these good initialization?)
-        return np.random.choice(ACTIONS, p=[.2, .2, .2, .2, .1, .1])
+        return np.random.choice(ACTIONS, p=DEFAULT_PROBS)
     if self.isFit:
         self.logger.debug("Querying model for action.")
         # or array.reshape(1, -1) if it contains a single sample
@@ -82,17 +85,20 @@ def act(self, game_state: dict) -> str:
         q_values = self.model.predict(features).reshape(-1)
         self.logger.debug(f"Shape of the predicted q-values: {q_values.shape}")
 
+        # get probabilities from the q_values
+
         # normalize the q_values, take care not to divide by zero (fall back to default probs)
         if q_values.sum() != 0:
-            probs = q_values / q_values.sum()
+            probs = (q_values-q_values.min()) / (q_values.max()-q_values.min())  # min-max scaling
+            probs = probs / probs.sum()  # normalization
         else:
-            probs = [.2, .2, .2, .2, .1, .1]
+            probs = DEFAULT_PROBS
 
         # using a stochastic policy!
         return np.random.choice(ACTIONS, p=probs)
     # if we have not yet fit the model return random action
     else:
-        return np.random.choice(ACTIONS, p=[.2, .2, .2, .2, .1, .1])
+        return np.random.choice(ACTIONS, p=DEFAULT_PROBS)
 
 
 def state_to_features(game_state: dict) -> np.array:
@@ -117,15 +123,24 @@ def state_to_features(game_state: dict) -> np.array:
     # with open("/Users/philipp/game_dict.pt", "wb") as file: pickle.dump(game_state, file)
     # with open("/Users/philipp/game_dict.pt", "rb") as file: game_dict = pickle.load(file)
 
-    # for the coin challenge we need to know where walls are and where the coins are
-    # so, we create a coin map in the same shape as the field
-    coin_map = np.zeros(game_state["field"].shape)
-    for cx, cy in game_state["coins"]:
-        coin_map[cx, cy] = 1
+    option = 0
 
-    # create channels based on the field and coin information.
-    channels = [game_state["field"], coin_map]
-    # concatenate them as a feature tensor (they must have the same shape), ...
-    stacked_channels = np.stack(channels)
-    # and return them as a vector
-    return stacked_channels.reshape(-1)
+    if option == 0:
+        # for the coin challenge we need to know where the agent is, where walls are and where the coins are
+        # so, we create a coin map in the same shape as the field
+        coin_map = np.zeros(game_state["field"].shape)
+        for cx, cy in game_state["coins"]:
+            coin_map[cx, cy] = 1
+
+        self_map = np.zeros(game_state["field"].shape)
+        self_map[game_state["self"][3]] = 1
+
+        # create channels based on the field and coin information.
+        # channels = [self_map, game_state["field"], coin_map]
+        channels = [self_map, coin_map]
+        # concatenate them as a feature tensor (they must have the same shape), ...
+        stacked_channels = np.stack(channels)
+        # and return them as a vector
+        return stacked_channels.reshape(-1)
+    elif option == 1:
+        pass

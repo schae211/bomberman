@@ -1,13 +1,13 @@
+
 import os
 import pickle
-import random
 import numpy as np
-from collections import deque
 
 # import MultiOutputRegressor to create MultiOutputRegressor with LGBMRegressor
 from sklearn.multioutput import MultiOutputRegressor
 from lightgbm import LGBMRegressor
 
+# helper lists and dictionaries
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 ACTION_TRANSLATE = {
     "UP": 0,
@@ -26,23 +26,17 @@ ACTION_TRANSLATE_REV = {
     5: "BOMB"
 }
 
-# TODO: Bombs are disabled
+# FIXME: Bombs are disabled
 DEFAULT_PROBS = [.225, .225, .225, .225, .1, .0]
 
-# Setting up the hyper parameters (is it ok to put the here?
-# starting with a simple espilon greedy strategy
+# starting with a simple epsilon greedy strategy
 EPSILON = 0.1
 
+# Define option for policy: {"stochastic", "deterministic"}
 POLICY = "deterministic"
 
-# for later usage to reduce exploration over time, for simplicity we will start with epsilon-greedy strategy
-# EXPLORATION_MAX = 1.0
-# we must push minimum exploration rate up to prevent the learner from getting stuck.
-# It is likely that the small memory we have will get filled with low quality experiences,
-# so we need to keep exploring
-# EXPLORATION_MIN = 0.05
-# EXPLORATION_DECAY = 0.96
-
+# Define option for feature engineering: {"standard", "minimal", }
+FEAT_ENG = "standard"
 
 def setup(self):
     """
@@ -139,22 +133,15 @@ def state_to_features(game_state: dict) -> np.array:
     if game_state is None:
         return None
 
-    # for learning saving the game state if not None:
-    # with open("/Users/philipp/game_dict.pt", "wb") as file: pickle.dump(game_state, file)
-    # with open("/Users/philipp/game_dict.pt", "rb") as file: game_dict = pickle.load(file)
-
-    # define different options for creating the features
-    option = 0
-
-    if option == 0:
+    if FEAT_ENG == "standard":
         # for the coin challenge we need to know where the agent is, where walls are and where the coins are
         # so, we create a coin map in the same shape as the field
-        coin_map = np.zeros(game_state["field"].shape)
+        coin_map = np.zeros_like(game_state["field"])
         for cx, cy in game_state["coins"]:
             coin_map[cx, cy] = 1
 
         # also adding where one self is on the map
-        self_map = np.zeros(game_state["field"].shape)
+        self_map = np.zeros_like(game_state["field"])
         self_map[game_state["self"][3]] = 1
 
         # create channels based on the field and coin information.
@@ -164,5 +151,13 @@ def state_to_features(game_state: dict) -> np.array:
         stacked_channels = np.stack(channels)
         # and return them as a vector
         return stacked_channels.reshape(-1)
-    elif option == 1:
-        pass
+
+    elif FEAT_ENG == "minimal":
+        coin_map = np.zeros_like(game_state["field"])
+        for cx, cy in game_state["coins"]:
+            coin_map[cx, cy] = 1
+        s = np.array(game_state["self"][3])
+        return np.concatenate([coin_map.reshape(-1), s])
+
+
+

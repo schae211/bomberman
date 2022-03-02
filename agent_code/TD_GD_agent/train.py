@@ -86,9 +86,9 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
     self.logger.debug(f'Encountered game event(s) {", ".join(map(repr, events))} in step {new_game_state["step"]}')
 
     # fill our memory after each step, state_to_features is defined in callbacks.py and imported above
-    self.memory.append(Transition(state_to_features(old_game_state),    # state
-                                  self_action,                          # action
-                                  state_to_features(new_game_state),    # next_state
+    self.memory.append(Transition(state_to_features(old_game_state),                    # state
+                                  self_action,                                          # action
+                                  state_to_features(new_game_state),                    # next_state
                                   reward_from_events(self, events, old_game_state)))    # reward
 
     # Idea: Add your own events to hand out rewards
@@ -117,7 +117,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     # Train the model
     self.logger.debug(f"Starting to train the model (has it been fit before={self.isFit})\n")
 
-    # initialize our X and y which we use for fitting later on
+    # initialize our x and y which we use for fitting later on
     x = []
     y = []
 
@@ -136,7 +136,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
             # for the action that was selected, we can compute the updated q_value
             # see lecture "temporal difference q-learning"
-            q_update = (reward + GAMMA * np.max(self.model.predict(state_next.reshape(1, -1)))) # reshape for single instance
+            q_update = (reward + GAMMA * np.max(self.model.predict(state_next.reshape(1, -1))))  # reshape for single instance
 
             # use the model to predict all the other q_values
             # (below we replace the q_value for the selected action with this q_update)
@@ -154,11 +154,11 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         x.append(state)
         y.append(q_values)
 
-        # augmentation
-        augmented_states, augmented_values = augment_training(state, q_values)
-        for s, qval in zip(augmented_states, augmented_values):
-            x.append(s)
-            y.append(qval)
+        # augmentation (turned off for now)
+        #augmented_states, augmented_values = augment_training(state, q_values)
+        #for s, qval in zip(augmented_states, augmented_values):
+        #    x.append(s)
+        #    y.append(qval)
 
     # importantly partial fitting is not possible with most methods except for NN (so we fit again to the whole TS)
     self.logger.debug(f"Fitting the model using the input as specified below:")
@@ -177,7 +177,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
 
 # this is where we are going to specify the rewards for certain actions
-def reward_from_events(self, events: List[str], game_state) -> int:
+def reward_from_events(self, events: List[str], game_state: dict) -> int:
     """
     Computing the rewards for our agent in a given step
     """
@@ -186,13 +186,15 @@ def reward_from_events(self, events: List[str], game_state) -> int:
         game_state = {"step": 0}
 
     game_rewards = {
-        e.COIN_COLLECTED: 10 * 0.99**game_state["step"],  # discount the reward for collecting coins over time
+        # TODO: maybe reduce discount factor
+        e.COIN_COLLECTED: 20 * 0.99**game_state["step"],  # discount the reward for collecting coins over time
         #e.COIN_COLLECTED: 10,
         e.KILLED_SELF: -10,
-        e.INVALID_ACTION: -1
+        e.INVALID_ACTION: -1,
+        e.WAITED: -0.5
         # for now, I will keep it simply and only use one reward for collecting coins!
-        #e.KILLED_OPPONENT: 5,
-        #PLACEHOLDER_EVENT: -.1  # idea: the custom event is bad
+        # e.KILLED_OPPONENT: 5,
+        # PLACEHOLDER_EVENT: -.1  # idea: the custom event is bad
     }
     reward_sum = 0
     for event in events:
@@ -217,6 +219,7 @@ def augment_training(state, q_values):
         augmented_states.append(np.rot90(reshape_feature, i, axes=(1, 2)).reshape(-1))
         augmented_values.append(rotated_actions(i, q_values))
     return augmented_states, augmented_values
+
 
 def rotated_actions(rot, q_values):
     """

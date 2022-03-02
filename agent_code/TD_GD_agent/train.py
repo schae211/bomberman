@@ -102,9 +102,9 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
     self.logger.debug(f'Encountered game event(s) {", ".join(map(repr, events))} in step {new_game_state["step"]}')
 
     # fill our memory after each step, state_to_features is defined in callbacks.py and imported above
-    self.memory.append(Transition(state_to_features(old_game_state),                    # state
-                                  self_action,                                          # action
-                                  state_to_features(new_game_state),                    # next_state
+    self.memory.append(Transition(state_to_features(old_game_state),                                    # state
+                                  self_action,                                                          # action
+                                  state_to_features(new_game_state),                                    # next_state
                                   reward_from_events(self, events, old_game_state, new_game_state)))    # reward
 
     #if True:
@@ -126,7 +126,9 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     # info that episode is over
     self.logger.debug(f'Encountered event(s) {", ".join(map(repr, events))} in final step')
     # also adding the last state to the memory (which we are not using anyway)
-    self.memory.append(Transition(state_to_features(last_game_state), last_action, None,
+    self.memory.append(Transition(state_to_features(last_game_state),
+                                  last_action,
+                                  None,
                                   reward_from_events(self, events, last_game_state, None)))
 
     # Train the model
@@ -139,15 +141,15 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     # extract information from each transition tuple (as stored above)
     for state, action, state_next, reward in self.memory:
 
-        # Apparently, I cannot use the first and last state for training
-        if state is None or state_next is None:
-            continue
-
         # translate action to int
         action = ACTION_TRANSLATE[action]
 
+        # Apparently, I cannot use the first and last state for training
+        if state is None:
+            continue
+
         # if we have fit the model before q-update is the following
-        if self.isFit:
+        if self.isFit and state_next is not None:
 
             # for the action that was selected, we can compute the updated q_value
             # see lecture "temporal difference q-learning"
@@ -157,6 +159,11 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
             # (below we replace the q_value for the selected action with this q_update)
             q_values = self.model.predict(state.reshape(1, -1)).reshape(-1)
 
+        # for the final state we cannot predict q-values, because we do not get state information back,
+        # so we might try this here.
+        elif self.isFit and state_next is None:
+            q_update = reward
+            q_values = self.model.predict(state.reshape(1, -1)).reshape(-1)
         # if we haven't fit the model before the q-update is only the reward, and we set all other q_values to 0
         else:
             q_update = reward

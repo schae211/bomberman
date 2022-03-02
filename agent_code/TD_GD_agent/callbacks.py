@@ -26,8 +26,9 @@ ACTION_TRANSLATE_REV = {
     5: "BOMB"
 }
 
-# FIXME: Bombs are disabled
+# FIXME: Bombs are crazy high
 DEFAULT_PROBS = [.225, .225, .225, .225, .1, .0]
+DEFAULT_PROBS = [.2, .2, .2, .2, .0, .2]
 
 # starting with a simple epsilon greedy strategy
 EPSILON = 0.1

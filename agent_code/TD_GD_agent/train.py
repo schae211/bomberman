@@ -3,6 +3,7 @@ from collections import namedtuple, deque
 import numpy as np
 import pickle
 from typing import List
+import pandas as pd
 
 import events as e
 from .callbacks import state_to_features
@@ -40,15 +41,12 @@ EPSILON = 0.1
 # reducing epsilon over time
 EPSILON_REDUCTION = 0.99
 
-# learning rate alpha
-LEARNING_RATE = 0.001
-
 # memory size "experience buffer", if I fit the model only after each episode a large memory size should be fine
 # i think this parameter effectively determines how fast I can train the model (i.e. how long each round takes)
 MEMORY_SIZE = 200
 
-# min size before starting to train? Should I implement this?
-#BATCH_SIZE = 20
+# what batch size should we use, and should we sample randomly or prioritize?
+# BATCH_SIZE = 20
 
 # what is this for?
 RECORD_ENEMY_TRANSITIONS = 1.0  # record enemy transitions with probability ...
@@ -63,14 +61,20 @@ AUGMENT = False
 # Needed for augmenting training data
 GAME_SIZE = 7
 
+# specify argument whether training statistics should be saved
+SAVE_TRAIN = True
+SAVE_AFTER = 100
+if SAVE_TRAIN:
+    step_information = {"round": [], "step": [], "events": [], "reward": []}
+    episode_information = {"round": [], "TS_MSE_1": [], "TS_MSE_2": [], "TS_MSE_3": [],
+                           "TS_MSE_4": [], "TS_MSE_5": [], "TS_MSE_6": []}
+
 
 def setup_training(self):
     """
     Initialise self for training purpose.
 
     This is called after `setup` in callbacks.py.
-
-    TODO: Where should I initialize the model: self.model = MultiOutputRegressor(LGBMRegressor(n_estimators=100, n_jobs=-1))?
 
     :param self: This object is passed to all callbacks and you can set arbitrary values.
     """
@@ -107,7 +111,15 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
                                   state_to_features(new_game_state),                                    # next_state
                                   reward_from_events(self, events, old_game_state, new_game_state)))    # reward
 
-    #if True:
+    # use global step information variable
+    global step_information
+    if old_game_state:
+        step_information["round"].append(old_game_state["round"])
+        step_information["step"].append(old_game_state["step"])
+        step_information["events"].append("| ".join(map(repr, events)))
+        step_information["reward"].append(reward_from_events(self, events, old_game_state, new_game_state))
+
+    # if True:
     #    events.append(PLACEHOLDER_EVENT)
 
 def end_of_round(self, last_game_state: dict, last_action: str, events: List[str]):
@@ -130,6 +142,16 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
                                   last_action,
                                   None,
                                   reward_from_events(self, events, last_game_state, None)))
+
+    global step_information
+    if last_game_state:
+        step_information["round"].append(last_game_state["round"])
+        step_information["step"].append(last_game_state["step"])
+        step_information["events"].append("| ".join(map(repr, events)))
+        step_information["reward"].append(reward_from_events(self, events, last_game_state, None))
+
+    if last_game_state["round"] >= SAVE_AFTER:
+        pd.DataFrame(step_information).to_csv("game_stats.csv", index=False)
 
     # Train the model
     self.logger.debug(f"Starting to train the model (has it been fit before={self.isFit})\n")
@@ -192,6 +214,20 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     self.logger.debug(f"Shape y_reshape: {y_reshaped.shape}")
     self.model.fit(x_reshaped, y_reshaped)
     self.isFit = True
+
+    global episode_information
+    if last_game_state:
+        episode_information["round"].append(last_game_state["round"])
+        TS_MSE = ((self.model.predict(x_reshaped) - y_reshaped)**2).mean(axis=0)
+        episode_information["TS_MSE_1"].append(TS_MSE[0])
+        episode_information["TS_MSE_2"].append(TS_MSE[1])
+        episode_information["TS_MSE_3"].append(TS_MSE[2])
+        episode_information["TS_MSE_4"].append(TS_MSE[3])
+        episode_information["TS_MSE_5"].append(TS_MSE[4])
+        episode_information["TS_MSE_6"].append(TS_MSE[5])
+
+    if last_game_state["round"] >= SAVE_AFTER:
+        pd.DataFrame(episode_information).to_csv("episode_stats.csv", index=False)
 
     # Store the current model
     with open("my-saved-model.pt", "wb") as file:

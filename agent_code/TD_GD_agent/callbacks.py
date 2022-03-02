@@ -28,10 +28,10 @@ ACTION_TRANSLATE_REV = {
 
 # FIXME: Bombs are crazy high
 DEFAULT_PROBS = [.225, .225, .225, .225, .1, .0]
-DEFAULT_PROBS = [.2, .2, .2, .2, .0, .2]
+#DEFAULT_PROBS = [.2, .2, .2, .2, .0, .2]
 
 # starting with a simple epsilon greedy strategy
-EPSILON = 0.1
+EPSILON = 0.2
 
 # Define option for policy: {"stochastic", "deterministic"}
 POLICY = "deterministic"

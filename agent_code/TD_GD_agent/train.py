@@ -34,11 +34,18 @@ ACTION_TRANSLATE_REV = {
 # discount rate
 GAMMA = 0.95
 
+# setting the parameter for epsilon-greedy policy, epsilon is the probability to do random move
+EPSILON = 0.1
+
+# reducing epsilon over time
+EPSILON_REDUCTION = 0.99
+
 # learning rate alpha
 LEARNING_RATE = 0.001
 
 # memory size "experience buffer", if I fit the model only after each episode a large memory size should be fine
-MEMORY_SIZE = 400
+# i think this parameter effectively determines how fast I can train the model (i.e. how long each round takes)
+MEMORY_SIZE = 200
 
 # min size before starting to train? Should I implement this?
 #BATCH_SIZE = 20
@@ -49,8 +56,13 @@ RECORD_ENEMY_TRANSITIONS = 1.0  # record enemy transitions with probability ...
 # Events
 PLACEHOLDER_EVENT = "PLACEHOLDER"
 
+# should training data be augmented? {True, False}
+# keep in mind that it only works for proper channels at the moment.
+AUGMENT = False
+
 # Needed for augmenting training data
 GAME_SIZE = 7
+
 
 def setup_training(self):
     """
@@ -64,6 +76,10 @@ def setup_training(self):
     """
     # Set up an array that will keep track of transition tuples (s, a, r, s')
     self.memory = deque(maxlen=MEMORY_SIZE)
+
+    # adding epsilon var to agent
+    self.epsilon = EPSILON
+    self.epsilon_reduction = EPSILON_REDUCTION
 
 
 def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_state: dict, events: List[str]):
@@ -153,11 +169,11 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         x.append(state)
         y.append(q_values)
 
-        # augmentation (turned off for now)
-        #augmented_states, augmented_values = augment_training(state, q_values)
-        #for s, qval in zip(augmented_states, augmented_values):
-        #    x.append(s)
-        #    y.append(qval)
+        if AUGMENT:
+            augmented_states, augmented_values = augment_training(state, q_values)
+            for s, qval in zip(augmented_states, augmented_values):
+                x.append(s)
+                y.append(qval)
 
     # importantly partial fitting is not possible with most methods except for NN (so we fit again to the whole TS)
     self.logger.debug(f"Fitting the model using the input as specified below:")
@@ -204,15 +220,12 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
     game_rewards = {
         # TODO: Tune (e.g. reduce) the discount factor
         e.COIN_COLLECTED: 20 * 0.99**step,  # discount the reward for collecting coins over time
-        #e.COIN_COLLECTED: 10,
         e.KILLED_SELF: -10,
         e.INVALID_ACTION: -1,
         e.WAITED: -0.5,
         e.MOVE_TO_COIN: 2,
         e.MOVE_FROM_COIN: -2
-        # for now, I will keep it simply and only use one reward for collecting coins!
-        # e.KILLED_OPPONENT: 5,
-        # PLACEHOLDER_EVENT: -.1  # idea: the custom event is bad
+        # e.KILLED_OPPONENT: 5 # not useful at the moment
     }
     reward_sum = 0
     for event in events:

@@ -35,8 +35,9 @@ EPSILON = 0.1
 # Define option for policy: {"stochastic", "deterministic"}
 POLICY = "deterministic"
 
-# Define option for feature engineering: {"standard", "minimal", }
-FEAT_ENG = "standard"
+# Define option for feature engineering: {"standard", "minimal"}
+FEAT_ENG = "minimal"
+
 
 def setup(self):
     """
@@ -62,9 +63,6 @@ def setup(self):
         with open("my-saved-model.pt", "rb") as file:
             self.model = pickle.load(file)
 
-    # to navigate exploration-exploitation tradeoff
-    self.epsilon = EPSILON
-
     # variable necessary to keep track if we have fitted our MultiOutputRegressor(LGBMRegressor(...))
     self.isFit = False
 
@@ -80,7 +78,8 @@ def act(self, game_state: dict) -> str:
     """
 
     # only do exploration if we train, no random moves in tournament
-    if self.train and np.random.rand() < EPSILON:
+    step = 0 if game_state is None else game_state["step"]
+    if self.train and np.random.rand() <= (self.epsilon*self.epsilon_reduction**step):
         self.logger.debug("Choosing action at random due to epsilon-greedy policy")
         return np.random.choice(ACTIONS, p=DEFAULT_PROBS)
 
@@ -94,11 +93,9 @@ def act(self, game_state: dict) -> str:
         q_values = self.model.predict(features).reshape(-1)
 
         if POLICY == "deterministic":
-            self.logger.debug(f"{q_values=}")
-            self.logger.debug(f"{np.argmax(q_values)=}")
             return ACTION_TRANSLATE_REV[np.argmax(q_values)]
-        elif POLICY == "stochastic":
 
+        elif POLICY == "stochastic":
             # normalize the q_values, take care not to divide by zero (fall back to default probs)
             if any(q_values != 0):
                 probs = (q_values-q_values.min()) / (q_values.max()-q_values.min())  # min-max scaling
@@ -108,7 +105,7 @@ def act(self, game_state: dict) -> str:
                 probs = DEFAULT_PROBS
 
             # using a stochastic policy!
-            #return np.random.choice(ACTIONS, p=probs)
+            return np.random.choice(ACTIONS, p=probs)
 
     # if we have not yet fit the model return random action
     else:
@@ -153,11 +150,37 @@ def state_to_features(game_state: dict) -> np.array:
         return stacked_channels.reshape(-1)
 
     elif FEAT_ENG == "minimal":
-        coin_map = np.zeros_like(game_state["field"])
-        for cx, cy in game_state["coins"]:
-            coin_map[cx, cy] = 1
-        s = np.array(game_state["self"][3])
-        return np.concatenate([coin_map.reshape(-1), s])
 
+        # self position
+        s = np.array(game_state["self"][3])
+
+        # also adding situational awareness, indicating in which directions the agent could move
+        awareness = np.array([
+            game_state["field"][s[0] - 1, s[1]],    # up
+            game_state["field"][s[0], s[1] + 1],    # right
+            game_state["field"][s[0] + 1, s[1]],    # down
+            game_state["field"][s[0], s[1] - 1]     # left
+        ])
+        coins = game_state["coins"]
+        if len(coins) == 0:
+            coin_direction = np.zeros(4)
+        else:
+            distances = [np.abs(np.array(coin_tup) - s).sum() for coin_tup in coins]
+            closest_coin = np.array(coins[np.argmin(distances)])
+            pos_diff = closest_coin - s
+            up, down, left, right = 0, 0, 0, 0
+            if pos_diff[0] < 0:
+                up = 1
+            elif pos_diff[0] > 0:
+                up = -1
+            if pos_diff[1] < 0:
+                left = 1
+            elif pos_diff[1] > 0:
+                left = -1
+            down = -up
+            right = -left
+            coin_direction = np.array([up, right, down, left])
+        features = np.concatenate([awareness, coin_direction])
+        return features
 
 

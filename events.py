@@ -19,5 +19,7 @@ GOT_KILLED = 'GOT_KILLED'
 OPPONENT_ELIMINATED = 'OPPONENT_ELIMINATED'
 SURVIVED_ROUND = 'SURVIVED_ROUND'
 
-# Added Event here:
-# MOVE_TO_COIN = "MOVE_TO_COIN"
+# adding events here to reward/penalize moving to/away from coins
+MOVE_TO_COIN = "MOVE_TO_COIN"
+MOVE_FROM_COIN = "MOVE_FROM_COIN"
+

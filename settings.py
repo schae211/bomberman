@@ -13,8 +13,7 @@ ROWS = 7
 
 SCENARIOS = {
     "coin-heaven": {
-        #"CRATE_DENSITY": 0,
-        "CRATE_DENSITY": 0.4,
+        "CRATE_DENSITY": 0,
         "COIN_COUNT": 8
         # "COIN_COUNT": 50
 

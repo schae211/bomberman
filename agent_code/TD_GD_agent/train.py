@@ -89,10 +89,9 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
     self.memory.append(Transition(state_to_features(old_game_state),                    # state
                                   self_action,                                          # action
                                   state_to_features(new_game_state),                    # next_state
-                                  reward_from_events(self, events, old_game_state)))    # reward
+                                  reward_from_events(self, events, old_game_state, new_game_state)))    # reward
 
-    # Idea: Add your own events to hand out rewards
-    #if ...:
+    #if True:
     #    events.append(PLACEHOLDER_EVENT)
 
 def end_of_round(self, last_game_state: dict, last_action: str, events: List[str]):
@@ -112,7 +111,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     self.logger.debug(f'Encountered event(s) {", ".join(map(repr, events))} in final step')
     # also adding the last state to the memory (which we are not using anyway)
     self.memory.append(Transition(state_to_features(last_game_state), last_action, None,
-                                  reward_from_events(self, events, last_game_state)))
+                                  reward_from_events(self, events, last_game_state, None)))
 
     # Train the model
     self.logger.debug(f"Starting to train the model (has it been fit before={self.isFit})\n")
@@ -177,21 +176,40 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
 
 # this is where we are going to specify the rewards for certain actions
-def reward_from_events(self, events: List[str], game_state: dict) -> int:
+def reward_from_events(self, events: List[str], old_game_state: dict, new_game_state) -> int:
     """
     Computing the rewards for our agent in a given step
     """
-    # for the first step nothing is returned
-    if game_state is None:
-        game_state = {"step": 0}
+
+    # for the first step nothing is returned, but I need the step argument to discount the coin reward
+    if old_game_state is None:
+        step = 0
+    else:
+        step = old_game_state["step"]
+
+    # add reward/penalty based on  whether the agent moved towards/away from the nearest coin (manhatten distance)
+    if old_game_state and new_game_state:
+        old_self = np.array(old_game_state["self"][3])
+        coins = old_game_state["coins"]
+        distances = [np.abs(np.array(coin_tup) - old_self).sum() for coin_tup in coins]
+        closest_coin = np.argmin(distances)
+        original_distance = np.min(distances)
+        new_self = np.array(new_game_state["self"][3])
+        updated_distance = np.abs(np.array(coins[closest_coin]) - new_self).sum()
+        if updated_distance < original_distance:
+            events.append(e.MOVE_TO_COIN)
+        elif updated_distance > original_distance:
+            events.append(e.MOVE_FROM_COIN)
 
     game_rewards = {
-        # TODO: maybe reduce discount factor
-        e.COIN_COLLECTED: 20 * 0.99**game_state["step"],  # discount the reward for collecting coins over time
+        # TODO: Tune (e.g. reduce) the discount factor
+        e.COIN_COLLECTED: 20 * 0.99**step,  # discount the reward for collecting coins over time
         #e.COIN_COLLECTED: 10,
         e.KILLED_SELF: -10,
         e.INVALID_ACTION: -1,
-        e.WAITED: -0.5
+        e.WAITED: -0.5,
+        e.MOVE_TO_COIN: 2,
+        e.MOVE_FROM_COIN: -2
         # for now, I will keep it simply and only use one reward for collecting coins!
         # e.KILLED_OPPONENT: 5,
         # PLACEHOLDER_EVENT: -.1  # idea: the custom event is bad
@@ -200,8 +218,10 @@ def reward_from_events(self, events: List[str], game_state: dict) -> int:
     for event in events:
         if event in game_rewards:
             reward_sum += game_rewards[event]
+
     self.logger.info(f"Awarded {reward_sum} for events {', '.join(events)}")
     return reward_sum
+
 
 # TODO: Augment training data by exploiting symmetry (so we have to play less)
 def augment_training(state, q_values):

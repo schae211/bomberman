@@ -6,6 +6,8 @@ import numpy as np
 # import MultiOutputRegressor to create MultiOutputRegressor with LGBMRegressor
 from sklearn.multioutput import MultiOutputRegressor
 from lightgbm import LGBMRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
 
 # helper lists and dictionaries
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
@@ -57,7 +59,9 @@ def setup(self):
     if self.train or not os.path.isfile("my-saved-model.pt"):
         self.logger.info("Setting up model from scratch.")
         # n_jobs=-1 means that all CPUs are used.
-        self.model = MultiOutputRegressor(LGBMRegressor(n_estimators=100, n_jobs=-1))
+        self.model = MultiOutputRegressor(LGBMRegressor(n_estimators=10, n_jobs=-1))
+        # self.model = LinearRegression()
+        # self.model = MultiOutputRegressor(RandomForestRegressor(n_estimators=100, n_jobs=-1))
     else:
         self.logger.info("Loading model from saved state.")
         # if a model has been trained before, load it again

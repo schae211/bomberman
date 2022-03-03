@@ -43,16 +43,13 @@ EPSILON_REDUCTION = 0.99
 
 # memory size "experience buffer", if I fit the model only after each episode a large memory size should be fine
 # i think this parameter effectively determines how fast I can train the model (i.e. how long each round takes)
-MEMORY_SIZE = 200
+MEMORY_SIZE = 500
 
 # what batch size should we use, and should we sample randomly or prioritize?
 # BATCH_SIZE = 20
 
 # what is this for?
 RECORD_ENEMY_TRANSITIONS = 1.0  # record enemy transitions with probability ...
-
-# Events
-PLACEHOLDER_EVENT = "PLACEHOLDER"
 
 # should training data be augmented? {True, False}
 # keep in mind that it only works for proper channels at the moment.
@@ -150,8 +147,8 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         step_information["events"].append("| ".join(map(repr, events)))
         step_information["reward"].append(reward_from_events(self, events, last_game_state, None))
 
-    if last_game_state["round"] >= SAVE_AFTER:
-        pd.DataFrame(step_information).to_csv("game_stats.csv", index=False)
+        if last_game_state["round"] >= SAVE_AFTER:
+            pd.DataFrame(step_information).to_csv("game_stats.csv", index=False)
 
     # Train the model
     self.logger.debug(f"Starting to train the model (has it been fit before={self.isFit})\n")
@@ -212,7 +209,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     y_reshaped = np.stack(y, axis=0)
     self.logger.debug(f"Shape x_reshape: {x_reshaped.shape}")
     self.logger.debug(f"Shape y_reshape: {y_reshaped.shape}")
-    self.model.fit(x_reshaped, y_reshaped)
+    self.model.fit(X=x_reshaped, y=y_reshaped)
     self.isFit = True
 
     global episode_information
@@ -262,12 +259,12 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
 
     game_rewards = {
         # TODO: Tune (e.g. reduce) the discount factor
-        e.COIN_COLLECTED: 20 * 0.99**step,  # discount the reward for collecting coins over time
+        e.COIN_COLLECTED: 100 * 0.99**step,  # discount the reward for collecting coins over time
         e.KILLED_SELF: -10,
         e.INVALID_ACTION: -1,
         e.WAITED: -0.5,
-        e.MOVE_TO_COIN: 2,
-        e.MOVE_FROM_COIN: -2
+        e.MOVE_TO_COIN: 10,
+        e.MOVE_FROM_COIN: -10
         # e.KILLED_OPPONENT: 5 # not useful at the moment
     }
     reward_sum = 0

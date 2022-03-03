@@ -3,19 +3,19 @@ from pathlib import Path
 
 from fallbacks import pygame
 
+# TODO: tweak here
 # Original Game properties
-# COLS = 17
-# ROWS = 17
-
-# Simplification to check whether the training works
-COLS = 7
-ROWS = 7
+COLS = 17
+ROWS = 17
+# COLS = 7
+# ROWS = 7
 
 SCENARIOS = {
+    # TODO: teak here
     "coin-heaven": {
         "CRATE_DENSITY": 0,
-        "COIN_COUNT": 6
-        # "COIN_COUNT": 50
+        # "COIN_COUNT": 6
+        "COIN_COUNT": 50
 
     },
     # This is the tournament game mode
@@ -28,9 +28,9 @@ SCENARIOS = {
 }
 MAX_AGENTS = 4
 
-# Fixme: Round properties
-# MAX_STEPS = 400
-MAX_STEPS = 100
+# TODO: tweak here
+MAX_STEPS = 400
+# MAX_STEPS = 100
 
 # GUI properties
 GRID_SIZE = 30

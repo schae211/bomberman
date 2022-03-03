@@ -91,6 +91,7 @@ def setup_training(self):
     # adding epsilon var to agent
     self.epsilon = EPSILON
     self.epsilon_reduction = EPSILON_REDUCTION
+    self.epsilon_min = MIN_EPSILON
 
 
 def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_state: dict, events: List[str]):

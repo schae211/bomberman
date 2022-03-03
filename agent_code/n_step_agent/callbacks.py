@@ -28,8 +28,8 @@ ACTION_TRANSLATE_REV = {
     5: "BOMB"
 }
 
-DEFAULT_PROBS = [.225, .225, .225, .225, .1, .0]
-#DEFAULT_PROBS = [.2, .2, .2, .2, .0, .2]
+# DEFAULT_PROBS = [.225, .225, .225, .225, .1, .0]
+DEFAULT_PROBS = [.2, .2, .2, .2, .1, .1]
 
 # Define option for policy: {"stochastic", "deterministic"}
 POLICY = "deterministic"
@@ -57,7 +57,7 @@ def setup(self):
         # n_jobs=-1 means that all CPUs are used.
         self.model = MultiOutputRegressor(LGBMRegressor(n_estimators=100, n_jobs=-1))
         # self.model = LinearRegression()
-        # self.model = MultiOutputRegressor(RandomForestRegressor(n_estimators=100, n_jobs=-1))
+        # self.model = MultiOutputRegressor(RandomForestRegressor(n_estimators=10, n_jobs=-1))  # very slow!
     else:
         self.logger.info("Loading model from saved state.")
         # if a model has been trained before, load it again
@@ -79,8 +79,9 @@ def act(self, game_state: dict) -> str:
     """
 
     # only do exploration if we train, no random moves in tournament
-    step = 0 if game_state is None else game_state["step"]
-    if self.train and np.random.rand() <= (self.epsilon*self.epsilon_reduction**step):
+    # reduce exploration in later episodes/games
+    episode_n = 0 if game_state is None else game_state["round"]
+    if self.train and np.random.rand() <= max(self.epsilon_min, self.epsilon*self.epsilon_reduction**episode_n):
         self.logger.debug("Choosing action at random due to epsilon-greedy policy")
         return np.random.choice(ACTIONS, p=DEFAULT_PROBS)
 

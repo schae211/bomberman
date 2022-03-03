@@ -11,7 +11,7 @@ from .callbacks import state_to_features
 
 # a way to structure our code?
 Transition = namedtuple("Transition",
-                        ("state", "action", "next_state", "reward"))
+                        ("round", "state", "action", "next_state", "reward"))
 
 ACTIONS = ["UP", "RIGHT", "DOWN", "LEFT", "WAIT", "BOMB"]
 ACTION_TRANSLATE = {
@@ -37,7 +37,7 @@ ACTION_TRANSLATE_REV = {
 GAMMA = 0.95
 
 # setting the parameter for epsilon-greedy policy, epsilon is the probability to do random move
-EPSILON = 0.1
+EPSILON = 0.2
 
 # reducing epsilon over time
 EPSILON_REDUCTION = 0.99
@@ -50,8 +50,7 @@ N = 5
 MEMORY_SIZE = 200
 
 # what batch size should we use, and should we sample randomly or prioritize?
-USE_BATCHES = False
-BATCH_SIZE = 100
+BATCH_SIZE = 200
 
 # what is this for?
 RECORD_ENEMY_TRANSITIONS = 1.0  # record enemy transitions with probability ...
@@ -108,10 +107,12 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
     self.logger.debug(f'Encountered game event(s) {", ".join(map(repr, events))} in step {new_game_state["step"]}')
 
     # fill our memory after each step, state_to_features is defined in callbacks.py and imported above
-    self.memory.append(Transition(state_to_features(old_game_state),                                    # state
-                                  self_action,                                                          # action
-                                  state_to_features(new_game_state),                                    # next_state
-                                  reward_from_events(self, events, old_game_state, new_game_state)))    # reward
+    if old_game_state:
+        self.memory.append(Transition(old_game_state["round"],
+                                      state_to_features(old_game_state),                                    # state
+                                      self_action,                                                          # action
+                                      state_to_features(new_game_state),                                    # next_state
+                                      reward_from_events(self, events, old_game_state, new_game_state)))    # reward
 
     # use global step information variable
     global step_information
@@ -140,17 +141,17 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     # info that episode is over
     self.logger.debug(f'Encountered event(s) {", ".join(map(repr, events))} in final step')
     # also adding the last state to the memory (which we are not using anyway)
-    self.memory.append(Transition(state_to_features(last_game_state),
+    self.memory.append(Transition(last_game_state["round"],
+                                  state_to_features(last_game_state),
                                   last_action,
                                   None,
                                   reward_from_events(self, events, last_game_state, None)))
 
     global step_information
-    if last_game_state:
-        step_information["round"].append(last_game_state["round"])
-        step_information["step"].append(last_game_state["step"])
-        step_information["events"].append("| ".join(map(repr, events)))
-        step_information["reward"].append(reward_from_events(self, events, last_game_state, None))
+    step_information["round"].append(last_game_state["round"])
+    step_information["step"].append(last_game_state["step"])
+    step_information["events"].append("| ".join(map(repr, events)))
+    step_information["reward"].append(reward_from_events(self, events, last_game_state, None))
 
     if last_game_state["round"] >= SAVE_AFTER:
         pd.DataFrame(step_information).to_csv("game_stats.csv", index=False)
@@ -163,44 +164,56 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     y = []
 
     # get a batch
-    if len(self.memory) > BATCH_SIZE and USE_BATCHES:
-        batch = random.sample(self.memory, BATCH_SIZE)
+    if len(self.memory) > BATCH_SIZE:
+        #batch = random.sample(self.memory, BATCH_SIZE)
+        batch = random.sample(range(len(self.memory)), BATCH_SIZE)
     else:
-        batch = self.memory
+        batch = range(len(self.memory))
 
     # extract information from each transition tuple (as stored above)
-    for i, (state, action, state_next, reward) in enumerate(batch):
+    for i in batch:
+
+        # get episode
+        episode = self.memory[i].round
+        state = self.memory[i].state
+        immediate_reward = self.memory[i].reward
 
         # translate action to int
-        action = ACTION_TRANSLATE[action]
+        action = ACTION_TRANSLATE[self.memory[i].action]
 
-        # Apparently, I cannot use the first and last state for training
-        if state is None:
+        # check whether state is none, which corresponds to the first state
+        if self.memory[i].state is None:
             continue
 
-        # if we have fit the model before q-update is the following
-        if self.isFit and state_next is not None and batch[min(i+N, len(batch)-1)].next_state is not None:
+        if self.isFit:
 
-            # for the action that was selected, we can compute the updated q_value
-            # see lecture "temporal difference q-learning"
-            q_update = (reward + GAMMA * np.amax(self.model.predict(state_next.reshape(1, -1))))  # reshape for single instance
+            # get the reward of the N next steps, check that loop does not extend over length of memory
+            rewards = []
+            loop_until = min(i+N, len(self.memory))  # Fixme: Does this still work with proper batches?
+            for t in range(i, loop_until):
+                # check whether we are still in the same episode
+                if self.memory[t].round == episode:
+                    rewards.append(self.memory[t].reward)
 
-            # now using n-step temporal difference to update the q-values
-            q_update = np.array([batch[t].reward*GAMMA**(t-i) for t in range(i, min(i+N, len(batch)-1))]).sum() + \
-                GAMMA * np.amax(self.model.predict(batch[min(i+N, len(batch)-1)].next_state.reshape(1, -1)))
+            gammas = [GAMMA**t for t in range(0, len(rewards))]
+
+            # now multiply elementwise discounted gammas by the rewards and get the sum
+            n_steps_reward = (np.array(rewards) * np.array(gammas)).sum()
+
+            # if we have a terminal state in the next states we cannot predict q-values for it
+            if self.memory[len(rewards)-1].next_state is None:
+                q_update = n_steps_reward
+            else:
+                q_update = n_steps_reward + GAMMA**N * \
+                           np.amax(self.model.predict(self.memory[len(rewards)-1].next_state.reshape(1, -1)))
 
             # use the model to predict all the other q_values
             # (below we replace the q_value for the selected action with this q_update)
             q_values = self.model.predict(state.reshape(1, -1)).reshape(-1)
 
-        # for the final state we cannot predict q-values, because we do not get state information back,
-        # so we might try this here.
-        elif self.isFit and state_next is None:
-            q_update = reward
-            q_values = self.model.predict(state.reshape(1, -1)).reshape(-1)
         # if we haven't fit the model before the q-update is only the reward, and we set all other q_values to 0
         else:
-            q_update = reward
+            q_update = immediate_reward
             q_values = np.zeros(len(ACTIONS))
 
         # for the action that we actually took update the q-value according to above

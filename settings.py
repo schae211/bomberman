@@ -14,7 +14,7 @@ ROWS = 7
 SCENARIOS = {
     "coin-heaven": {
         "CRATE_DENSITY": 0,
-        "COIN_COUNT": 8
+        "COIN_COUNT": 4
         # "COIN_COUNT": 50
 
     },
@@ -28,8 +28,9 @@ SCENARIOS = {
 }
 MAX_AGENTS = 4
 
-# Round properties
-MAX_STEPS = 400
+# Fixme: Round properties
+# MAX_STEPS = 400
+MAX_STEPS = 100
 
 # GUI properties
 GRID_SIZE = 30

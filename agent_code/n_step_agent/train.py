@@ -114,6 +114,9 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
     """
     self.logger.debug(f'Encountered game event(s) {", ".join(map(repr, events))} in step {new_game_state["step"]}')
 
+    # specify that we want to use the global step information variable
+    global step_information
+
     # fill our memory after each step, state_to_features is defined in callbacks.py and imported above
     if old_game_state:
         rewards = reward_from_events(self, events, old_game_state, new_game_state)
@@ -124,7 +127,6 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
                                       rewards))    # reward
 
         # use global step information variable
-        global step_information
         step_information["round"].append(old_game_state["round"])
         step_information["step"].append(old_game_state["step"])
         step_information["events"].append("| ".join(map(repr, events)))
@@ -132,6 +134,13 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
 
         # keep status of last N steps for reward shaping
         self.last_state.append(old_game_state["self"][3])
+
+    # first game state, can still be used by using the round information from the new game state
+    elif new_game_state:
+        step_information["round"].append(new_game_state["round"])
+        step_information["step"].append(0)
+        step_information["events"].append("| ".join(map(repr, events)))
+        step_information["reward"].append(0)
 
     # if True:
     #    events.append(PLACEHOLDER_EVENT)

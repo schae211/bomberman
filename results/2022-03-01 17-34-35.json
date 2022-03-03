@@ -1,0 +1,77 @@
+{
+    "by_agent": {
+        "TD_GD_agent": {
+            "bombs": 1,
+            "coins": 20,
+            "invalid": 832,
+            "moves": 258,
+            "rounds": 10,
+            "score": 20,
+            "steps": 3247,
+            "suicides": 1,
+            "time": 2.581690788269043
+        }
+    },
+    "by_round": {
+        "Round 01 (2022-03-01 17-34-24)": {
+            "coins": 5,
+            "kills": 0,
+            "steps": 93,
+            "suicides": 0
+        },
+        "Round 02 (2022-03-01 17-34-24)": {
+            "coins": 1,
+            "kills": 0,
+            "steps": 400,
+            "suicides": 0
+        },
+        "Round 03 (2022-03-01 17-34-25)": {
+            "coins": 0,
+            "kills": 0,
+            "steps": 5,
+            "suicides": 1
+        },
+        "Round 04 (2022-03-01 17-34-26)": {
+            "coins": 0,
+            "kills": 0,
+            "steps": 400,
+            "suicides": 0
+        },
+        "Round 05 (2022-03-01 17-34-27)": {
+            "coins": 2,
+            "kills": 0,
+            "steps": 400,
+            "suicides": 0
+        },
+        "Round 06 (2022-03-01 17-34-29)": {
+            "coins": 5,
+            "kills": 0,
+            "steps": 349,
+            "suicides": 0
+        },
+        "Round 07 (2022-03-01 17-34-30)": {
+            "coins": 2,
+            "kills": 0,
+            "steps": 400,
+            "suicides": 0
+        },
+        "Round 08 (2022-03-01 17-34-31)": {
+            "coins": 2,
+            "kills": 0,
+            "steps": 400,
+            "suicides": 0
+        },
+        "Round 09 (2022-03-01 17-34-33)": {
+            "coins": 2,
+            "kills": 0,
+            "steps": 400,
+            "suicides": 0
+        },
+        "Round 10 (2022-03-01 17-34-34)": {
+            "coins": 1,
+            "kills": 0,
+            "steps": 400,
+            "suicides": 0
+        }
+    }
+}

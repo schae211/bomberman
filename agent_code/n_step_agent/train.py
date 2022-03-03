@@ -8,6 +8,7 @@ import random
 
 import events as e
 from .callbacks import state_to_features
+from .callbacks import Node, possible_moves, get_neighbors, coin_bfs
 
 # a way to structure our code?
 Transition = namedtuple("Transition",
@@ -281,7 +282,8 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
         step = old_game_state["step"]
 
     # add reward/penalty based on whether the agent moved towards/away from the nearest coin (manhatten distance)
-    if old_game_state and new_game_state:
+    # also check here whether there are still coins?
+    if old_game_state and new_game_state and old_game_state["coins"] != []:
         coin_info = coin_bfs(old_game_state["field"], old_game_state["coins"], old_game_state["self"][3])
         closest_coin = coin_info[1][-1]
         next_move = coin_info[1][0]
@@ -357,87 +359,3 @@ def rotated_actions(rot, q_values):
         return np.array([q_values[2], q_values[3], q_values[0], q_values[1], q_values[4], q_values[5]])
     elif rot == 3:
         return np.array([q_values[1], q_values[2], q_values[3], q_values[0], q_values[4], q_values[5]])
-
-
-class Node(object):
-    def __init__(self, state, parent, action):
-        self.state = state
-        self.parent = parent
-        self.action = action
-
-
-def possible_moves(object_position, position):
-    moves = []
-    if object_position[position[0] - 1, position[1]] == 0:
-        moves.append("up")
-    if object_position[position[0], position[1] + 1] == 0:
-        moves.append("right")
-    if object_position[position[0] + 1, position[1]] == 0:
-        moves.append("down")
-    if object_position[position[0], position[1] - 1] == 0:
-        moves.append("left")
-    return moves
-
-
-def get_neighbors(object_position, position):
-    neighbors = []
-    possible = possible_moves(object_position, position)
-    for move in possible:
-        if move == "up":
-            neighbors.append((position[0]-1, position[1]))
-        elif move == "right":
-            neighbors.append((position[0], position[1]+1))
-        elif move == "down":
-            neighbors.append((position[0]+1, position[1]))
-        elif move == "left":
-            neighbors.append((position[0], position[1]-1))
-    return {"actions": possible, "neighbors": neighbors}
-
-
-def coin_bfs(object_position, coin_position, self_position):
-    """
-    Find path to nearest coin via breadth-first search (BFS)
-    :param object_position:
-    :param coin_position:
-    :param self_position:
-    :return:
-    """
-    q = []
-    explored = set()
-    # add start to the Queue
-    q.append(Node(state=self_position, parent=None, action=None))
-
-    # loop over the queue as long as it is not empty
-    while True:
-        if len(q) == 0:
-            raise Exception("no solution")
-
-        # always get first element
-        node = q.pop(0)
-
-        # found a coin, trace back to parent, but not if coin is where initial position is
-        if node.parent is not None and node.state in coin_position:
-            actions = []
-            cells = []
-            # Backtracking: From each node grab state and action; and then redefine node as parent node
-            while node.parent is not None:
-                actions.append(node.action)
-                cells.append(node.state)
-                node = node.parent
-            # Reverse is a method for lists that reverses the content
-            actions.reverse()
-            cells.reverse()
-            return actions, cells
-
-        explored.add(node.state)
-
-        # Add neighbors to frontier
-        neighbors = get_neighbors(object_position, node.state)
-        for action, neighbor in zip(neighbors["actions"], neighbors["neighbors"]):
-            if neighbor not in explored:
-                child = Node(state=neighbor, parent=node, action=action)
-                q.append(child)
-
-
-
-

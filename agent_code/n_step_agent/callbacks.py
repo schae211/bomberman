@@ -184,6 +184,28 @@ def state_to_features(game_state: dict) -> np.array:
         return features
 
 
+# define simple queue object that also allows checking for states
+class Queue(object):
+    def __init__(self):
+        self.fifo = []
+
+    def put(self, node):
+        self.fifo.append(node)
+
+    def contains_state(self, state):
+        return any(node.state == state for node in self.fifo)
+
+    def empty(self):
+        return len(self.fifo) == 0
+
+    def get(self):
+        if self.empty():
+            raise Exception("empty queue")
+        else:
+            node = self.fifo.pop(0)
+            return node
+
+
 class Node(object):
     def __init__(self, state, parent, action):
         self.state = state
@@ -227,18 +249,18 @@ def coin_bfs(object_position, coin_position, self_position):
     :param self_position:
     :return:
     """
-    q = []
+    q = Queue()
     explored = set()
     # add start to the Queue
-    q.append(Node(state=self_position, parent=None, action=None))
+    q.put(Node(state=self_position, parent=None, action=None))
 
     # loop over the queue as long as it is not empty
     while True:
-        if len(q) == 0:
+        if q.empty():
             raise Exception("no solution")
 
         # always get first element
-        node = q.pop(0)
+        node = q.get()
 
         # found a coin, trace back to parent, but not if coin is where initial position is
         if node.parent is not None and node.state in coin_position:
@@ -259,9 +281,9 @@ def coin_bfs(object_position, coin_position, self_position):
         # Add neighbors to frontier
         neighbors = get_neighbors(object_position, node.state)
         for action, neighbor in zip(neighbors["actions"], neighbors["neighbors"]):
-            if neighbor not in explored:
+            if neighbor not in explored and not q.contains_state(neighbor):
                 child = Node(state=neighbor, parent=node, action=action)
-                q.append(child)
+                q.put(child)
 
 
 

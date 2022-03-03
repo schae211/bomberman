@@ -67,7 +67,7 @@ GAME_SIZE = 7
 
 # specify argument whether training statistics should be saved
 SAVE_TRAIN = True
-SAVE_AFTER = 100
+SAVE_EVERY = 50
 if SAVE_TRAIN:
     step_information = {"round": [], "step": [], "events": [], "reward": []}
     episode_information = {"round": [], "TS_MSE_1": [], "TS_MSE_2": [], "TS_MSE_3": [],
@@ -162,7 +162,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     step_information["events"].append("| ".join(map(repr, events)))
     step_information["reward"].append(reward_from_events(self, events, last_game_state, None))
 
-    if last_game_state["round"] >= SAVE_AFTER:
+    if last_game_state["round"] % SAVE_EVERY == 0:
         pd.DataFrame(step_information).to_csv("game_stats.csv", index=False)
 
     # Train the model
@@ -259,7 +259,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         episode_information["TS_MSE_5"].append(TS_MSE[4])
         episode_information["TS_MSE_6"].append(TS_MSE[5])
 
-    if last_game_state["round"] >= SAVE_AFTER:
+    if last_game_state["round"] % SAVE_EVERY == 0:
         pd.DataFrame(episode_information).to_csv("episode_stats.csv", index=False)
 
     # Store the current model

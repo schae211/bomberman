@@ -30,7 +30,8 @@ ACTION_TRANSLATE_REV = {
 
 # DEFAULT_PROBS = [.225, .225, .225, .225, .1, .0] # no bombs
 # DEFAULT_PROBS = [.2, .2, .2, .2, .1, .1]
-DEFAULT_PROBS = [.15, .15, .15, .15, .1, .3]
+# DEFAULT_PROBS = [.15, .15, .15, .15, .1, .3]
+DEFAULT_PROBS = [.2, .2, .2, .2, .2, .2]
 
 # Define option for policy: {"stochastic", "deterministic"}
 POLICY = "deterministic"
@@ -216,12 +217,13 @@ def state_to_features(game_state: dict) -> np.array:
                     else:
                         explosion_map[bomb_pos[0], right_y] += 1
         # normalize explosion map
-        explosion_map = np.where(explosion_map > 0, True, False)
+        explosion_map = np.where(explosion_map > 0, 1, 0)
 
         # find the closest save spot
         explosion_direction = np.zeros(4)
         if np.sum(explosion_map) > 0:
-            explosion_info = save_bfs(object_position=game_state["field"], explosion_map=explosion_map, self_position=game_state["self"][3])
+            explosion_info = save_bfs(object_position=game_state["field"], explosion_map=explosion_map,
+                                      self_position=game_state["self"][3])
             if explosion_info == ([], []):  # ([], []) is returned if already in save position
                 pass
             elif explosion_info[0][0] == "up":
@@ -233,7 +235,16 @@ def state_to_features(game_state: dict) -> np.array:
             elif explosion_info[0][0] == "left":
                 explosion_direction[3] += 1
 
-        features = np.concatenate([awareness, coin_direction, explosion_direction])
+        danger = np.array([explosion_map[s[0], s[1]],       # current position
+                           explosion_map[s[0]-1, s[1]],     # up
+                           explosion_map[s[0], s[1]+1],     # right
+                           explosion_map[s[0]+1, s[1]],     # down
+                           explosion_map[s[0], s[1]-1]])    # left
+
+        if explosion_map.sum() > 0:
+            break_here = 0  # for debugging purposes, put condition above
+
+        features = np.concatenate([awareness, coin_direction, explosion_direction, danger])
         return features
 
 
@@ -360,7 +371,7 @@ def save_bfs(object_position, explosion_map, self_position):
         node = q.get()
 
         # found a save position
-        if not explosion_map[node.state]:
+        if explosion_map[node.state] == 0:
             actions = []
             cells = []
             # Backtracking: From each node grab state and action; and then redefine node as parent node

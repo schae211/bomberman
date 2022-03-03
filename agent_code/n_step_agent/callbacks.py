@@ -55,8 +55,8 @@ def setup(self):
     if self.train or not os.path.isfile("my-saved-model.pt"):
         self.logger.info("Setting up model from scratch.")
         # n_jobs=-1 means that all CPUs are used.
-        # self.model = MultiOutputRegressor(LGBMRegressor(n_estimators=100, n_jobs=-1))
-        self.model = LinearRegression()
+        self.model = MultiOutputRegressor(LGBMRegressor(n_estimators=100, n_jobs=-1))
+        # self.model = LinearRegression()
         # self.model = MultiOutputRegressor(RandomForestRegressor(n_estimators=100, n_jobs=-1))
     else:
         self.logger.info("Loading model from saved state.")
@@ -152,9 +152,6 @@ def state_to_features(game_state: dict) -> np.array:
 
     elif FEAT_ENG == "minimal":
 
-        # testing
-        coin_info = coin_bfs(object_position=game_state["field"], coin_position=game_state["coins"], self_position=game_state["self"][3])
-
         # self position
         s = np.array(game_state["self"][3])
 
@@ -169,6 +166,10 @@ def state_to_features(game_state: dict) -> np.array:
         if len(coins) == 0:
             coin_direction = np.zeros(4)
         else:
+            # perform BFS to find the nearest coin
+            coin_info = coin_bfs(object_position=game_state["field"], coin_position=game_state["coins"],
+                                 self_position=game_state["self"][3])
+
             coin_direction = np.zeros(4)
             if coin_info[0][0] == "up":
                 coin_direction[0] += 1
@@ -239,8 +240,8 @@ def coin_bfs(object_position, coin_position, self_position):
         # always get first element
         node = q.pop(0)
 
-        # found a coin, trace back to parent
-        if node.state in coin_position:
+        # found a coin, trace back to parent, but not if coin is where initial position is
+        if node.parent is not None and node.state in coin_position:
             actions = []
             cells = []
             # Backtracking: From each node grab state and action; and then redefine node as parent node

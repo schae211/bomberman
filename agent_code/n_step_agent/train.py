@@ -31,26 +31,29 @@ ACTION_TRANSLATE_REV = {
     5: "BOMB"
 }
 
-# Hyper parameters -- DO modify
+# Hyper parameters
 
 # discount rate
 GAMMA = 0.95
 
 # setting the parameter for epsilon-greedy policy, epsilon is the probability to do random move
-EPSILON = 0.2
+EPSILON = 0.1
 
 # reducing epsilon over time
-EPSILON_REDUCTION = 0.99
+EPSILON_REDUCTION = 0.98
+
+# define minimum epsilon
+MIN_EPSILON = 0.05
 
 # n-step temporal difference learning
-N = 5
+N = 6
 
 # memory size "experience buffer", if I fit the model only after each episode a large memory size should be fine
 # i think this parameter effectively determines how fast I can train the model (i.e. how long each round takes)
-MEMORY_SIZE = 200
+MEMORY_SIZE = 10000
 
 # what batch size should we use, and should we sample randomly or prioritize?
-BATCH_SIZE = 200
+BATCH_SIZE = 400
 
 # what is this for?
 RECORD_ENEMY_TRANSITIONS = 1.0  # record enemy transitions with probability ...
@@ -163,9 +166,8 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     x = []
     y = []
 
-    # get a batch
+    # get a batch -> using batches might be helpful to not get stuck in bad games...
     if len(self.memory) > BATCH_SIZE:
-        #batch = random.sample(self.memory, BATCH_SIZE)
         batch = random.sample(range(len(self.memory)), BATCH_SIZE)
     else:
         batch = range(len(self.memory))
@@ -287,8 +289,8 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
 
     game_rewards = {
         # TODO: Tune (e.g. reduce) the discount factor
-        #e.COIN_COLLECTED: 100 * 0.99**step,  # discount the reward for collecting coins over time
-        e.COIN_COLLECTED: 40,
+        e.COIN_COLLECTED: 40 * GAMMA**step,  # discount the reward for collecting coins over time
+        #e.COIN_COLLECTED: 40,
         e.KILLED_SELF: -20,
         e.INVALID_ACTION: -1,
         e.WAITED: -1,

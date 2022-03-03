@@ -41,7 +41,7 @@ GAMMA = 0.9
 EPSILON = 0.2
 
 # reducing epsilon over time
-EPSILON_REDUCTION = 0.98
+EPSILON_REDUCTION = 0.99
 
 # define minimum epsilon
 MIN_EPSILON = 0.05
@@ -313,7 +313,7 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
     game_rewards = {
         e.COIN_COLLECTED: 40 * GAMMA**step,  # discount the reward for collecting coins over time
         # e.COIN_COLLECTED: 40,
-        e.KILLED_SELF: -20,
+        e.KILLED_SELF: -200,
         e.INVALID_ACTION: -1,
         e.WAITED: -1,
         e.MOVE_TO_COIN: 5,

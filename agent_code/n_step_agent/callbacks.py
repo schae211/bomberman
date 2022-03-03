@@ -28,8 +28,9 @@ ACTION_TRANSLATE_REV = {
     5: "BOMB"
 }
 
-# DEFAULT_PROBS = [.225, .225, .225, .225, .1, .0]
-DEFAULT_PROBS = [.2, .2, .2, .2, .1, .1]
+# DEFAULT_PROBS = [.225, .225, .225, .225, .1, .0] # no bombs
+# DEFAULT_PROBS = [.2, .2, .2, .2, .1, .1]
+DEFAULT_PROBS = [.15, .15, .15, .15, .1, .3]
 
 # Define option for policy: {"stochastic", "deterministic"}
 POLICY = "deterministic"
@@ -181,7 +182,58 @@ def state_to_features(game_state: dict) -> np.array:
             elif coin_info[0][0] == "left":
                 coin_direction[3] += 1
 
-        features = np.concatenate([awareness, coin_direction])
+        # get information about affected areas
+        explosion_map = game_state["explosion_map"].copy()
+        bombs = game_state["bombs"].copy()
+        for bomb_pos, bomb_ctd in bombs:
+            explosion_map[bomb_pos] += 1
+            # check above
+            for up_x in range(bomb_pos[0]-1, bomb_pos[0]-4, -1):
+                if 0 <= up_x <= 16:
+                    if game_state["field"][up_x, bomb_pos[1]] == -1:
+                        break
+                    else:
+                        explosion_map[up_x, bomb_pos[1]] += 1
+            # check below
+            for down_x in range(bomb_pos[0]+1, bomb_pos[0]+4, 1):
+                if 0 <= down_x <= 16:
+                    if game_state["field"][down_x, bomb_pos[1]] == -1:
+                        break
+                    else:
+                        explosion_map[down_x, bomb_pos[1]] += 1
+            # check to the left
+            for left_y in range(bomb_pos[1]-1, bomb_pos[1]-4, -1):
+                if 0 <= left_y <= 16:
+                    if game_state["field"][bomb_pos[0], left_y] == -1:
+                        break
+                    else:
+                        explosion_map[bomb_pos[0], left_y] += 1
+            # check to the right
+            for right_y in range(bomb_pos[1]+1, bomb_pos[1]+4, 1):
+                if 0 <= right_y <= 16:
+                    if game_state["field"][bomb_pos[0], right_y] == -1:
+                        break
+                    else:
+                        explosion_map[bomb_pos[0], right_y] += 1
+        # normalize explosion map
+        explosion_map = np.where(explosion_map > 0, True, False)
+
+        # find the closest save spot
+        explosion_direction = np.zeros(4)
+        if np.sum(explosion_map) > 0:
+            explosion_info = save_bfs(object_position=game_state["field"], explosion_map=explosion_map, self_position=game_state["self"][3])
+            if explosion_info == ([], []):  # ([], []) is returned if already in save position
+                pass
+            elif explosion_info[0][0] == "up":
+                explosion_direction[0] += 1
+            elif explosion_info[0][0] == "right":
+                explosion_direction[1] += 1
+            elif explosion_info[0][0] == "down":
+                explosion_direction[2] += 1
+            elif explosion_info[0][0] == "left":
+                explosion_direction[3] += 1
+
+        features = np.concatenate([awareness, coin_direction, explosion_direction])
         return features
 
 
@@ -287,5 +339,47 @@ def coin_bfs(object_position, coin_position, self_position):
                 q.put(child)
 
 
+def save_bfs(object_position, explosion_map, self_position):
+    """
+    Find path to nearest save position via breadth-first search (BFS)
+    :param explosion_map:
+    :param self_position:
+    :return:
+    """
+    q = Queue()
+    explored = set()
+    # add start to the Queue
+    q.put(Node(state=self_position, parent=None, action=None))
+
+    # loop over the queue as long as it is not empty
+    while True:
+        if q.empty():
+            raise Exception("no solution")  # should not happen
+
+        # always get first element
+        node = q.get()
+
+        # found a save position
+        if not explosion_map[node.state]:
+            actions = []
+            cells = []
+            # Backtracking: From each node grab state and action; and then redefine node as parent node
+            while node.parent is not None:
+                actions.append(node.action)
+                cells.append(node.state)
+                node = node.parent
+            # Reverse is a method for lists that reverses the order
+            actions.reverse()
+            cells.reverse()
+            return actions, cells
+
+        explored.add(node.state)
+
+        # Add neighbors to frontier
+        neighbors = get_neighbors(object_position, node.state)
+        for action, neighbor in zip(neighbors["actions"], neighbors["neighbors"]):
+            if neighbor not in explored and not q.contains_state(neighbor):
+                child = Node(state=neighbor, parent=node, action=action)
+                q.put(child)
 
 

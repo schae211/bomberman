@@ -84,7 +84,11 @@ def act(self, game_state: dict) -> str:
         self.logger.debug("Choosing action at random due to epsilon-greedy policy")
         return np.random.choice(ACTIONS, p=DEFAULT_PROBS)
 
-    if self.isFit:
+    elif self.train and not self.isFit:
+        self.logger.debug("Choosing action at random because model is not fitted yet")
+        return np.random.choice(ACTIONS, p=DEFAULT_PROBS)
+
+    else:
         self.logger.debug("Querying fitted model for action.")
 
         # array.reshape(1, -1) if it contains a single sample for MultiOutputRegressor
@@ -107,10 +111,6 @@ def act(self, game_state: dict) -> str:
 
             # using a stochastic policy!
             return np.random.choice(ACTIONS, p=probs)
-
-    # if we have not yet fit the model return random action
-    else:
-        return np.random.choice(ACTIONS, p=DEFAULT_PROBS)
 
 
 def state_to_features(game_state: dict) -> np.array:
@@ -184,7 +184,7 @@ def state_to_features(game_state: dict) -> np.array:
         return features
 
 
-class Node():
+class Node(object):
     def __init__(self, state, parent, action):
         self.state = state
         self.parent = parent

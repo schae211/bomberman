@@ -34,10 +34,10 @@ ACTION_TRANSLATE_REV = {
 # Hyper parameters
 
 # discount rate
-GAMMA = 0.95
+GAMMA = 0.9
 
 # setting the parameter for epsilon-greedy policy, epsilon is the probability to do random move
-EPSILON = 0.1
+EPSILON = 0.2
 
 # reducing epsilon over time
 EPSILON_REDUCTION = 0.98
@@ -73,6 +73,8 @@ if SAVE_TRAIN:
     episode_information = {"round": [], "TS_MSE_1": [], "TS_MSE_2": [], "TS_MSE_3": [],
                            "TS_MSE_4": [], "TS_MSE_5": [], "TS_MSE_6": []}
 
+# global variable to store the last states
+LAST_STATES = 5
 
 def setup_training(self):
     """
@@ -84,6 +86,7 @@ def setup_training(self):
     """
     # Set up an array that will keep track of transition tuples (s, a, r, s')
     self.memory = deque(maxlen=MEMORY_SIZE)
+    self.last_state = deque(maxlen=LAST_STATES)
 
     # adding epsilon var to agent
     self.epsilon = EPSILON
@@ -111,19 +114,22 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
 
     # fill our memory after each step, state_to_features is defined in callbacks.py and imported above
     if old_game_state:
+        rewards = reward_from_events(self, events, old_game_state, new_game_state)
         self.memory.append(Transition(old_game_state["round"],
                                       state_to_features(old_game_state),                                    # state
                                       self_action,                                                          # action
                                       state_to_features(new_game_state),                                    # next_state
-                                      reward_from_events(self, events, old_game_state, new_game_state)))    # reward
+                                      rewards))    # reward
 
-    # use global step information variable
-    global step_information
-    if old_game_state:
+        # use global step information variable
+        global step_information
         step_information["round"].append(old_game_state["round"])
         step_information["step"].append(old_game_state["step"])
         step_information["events"].append("| ".join(map(repr, events)))
-        step_information["reward"].append(reward_from_events(self, events, old_game_state, new_game_state))
+        step_information["reward"].append(rewards)
+
+        # keep status of last N steps for reward shaping
+        self.last_state.append(old_game_state["self"][3])
 
     # if True:
     #    events.append(PLACEHOLDER_EVENT)
@@ -273,29 +279,34 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
     else:
         step = old_game_state["step"]
 
-    # add reward/penalty based on  whether the agent moved towards/away from the nearest coin (manhatten distance)
+    # add reward/penalty based on whether the agent moved towards/away from the nearest coin (manhatten distance)
     if old_game_state and new_game_state:
-        old_self = np.array(old_game_state["self"][3])
-        coins = old_game_state["coins"]
-        distances = [np.abs(np.array(coin_tup) - old_self).sum() for coin_tup in coins]
-        closest_coin = np.argmin(distances)
-        original_distance = np.min(distances)
-        new_self = np.array(new_game_state["self"][3])
-        updated_distance = np.abs(np.array(coins[closest_coin]) - new_self).sum()
-        if updated_distance < original_distance:
+        coin_info = coin_bfs(old_game_state["field"], old_game_state["coins"], old_game_state["self"][3])
+        closest_coin = coin_info[1][-1]
+        next_move = coin_info[1][0]
+        old_distance = np.abs(np.array(old_game_state["self"][3]) - np.array(closest_coin)).sum()
+        new_distance = np.abs(np.array(new_game_state["self"][3]) - np.array(closest_coin)).sum()
+        # actually check that we are making the right move here
+        if new_game_state["self"][3] == next_move:
             events.append(e.MOVE_TO_COIN)
-        elif updated_distance > original_distance:
+        elif new_distance > old_distance:
             events.append(e.MOVE_FROM_COIN)
 
+    # check whether agent stayed in the same spot for too long (3 out of 5?)
+    if new_game_state:
+        check_same_pos = np.array([state == new_game_state["self"][3] for state in self.last_state]).sum()
+        if check_same_pos >= 3:
+            events.append(e.MOVE_IN_CIRCLES)
+
     game_rewards = {
-        # TODO: Tune (e.g. reduce) the discount factor
         e.COIN_COLLECTED: 40 * GAMMA**step,  # discount the reward for collecting coins over time
-        #e.COIN_COLLECTED: 40,
+        # e.COIN_COLLECTED: 40,
         e.KILLED_SELF: -20,
         e.INVALID_ACTION: -1,
         e.WAITED: -1,
         e.MOVE_TO_COIN: 5,
-        e.MOVE_FROM_COIN: -5
+        e.MOVE_FROM_COIN: -5,
+        e.MOVE_IN_CIRCLES: -2
         # e.KILLED_OPPONENT: 5 # not useful at the moment
     }
     reward_sum = 0
@@ -345,4 +356,87 @@ def rotated_actions(rot, q_values):
         return np.array([q_values[2], q_values[3], q_values[0], q_values[1], q_values[4], q_values[5]])
     elif rot == 3:
         return np.array([q_values[1], q_values[2], q_values[3], q_values[0], q_values[4], q_values[5]])
+
+
+class Node(object):
+    def __init__(self, state, parent, action):
+        self.state = state
+        self.parent = parent
+        self.action = action
+
+
+def possible_moves(object_position, position):
+    moves = []
+    if object_position[position[0] - 1, position[1]] == 0:
+        moves.append("up")
+    if object_position[position[0], position[1] + 1] == 0:
+        moves.append("right")
+    if object_position[position[0] + 1, position[1]] == 0:
+        moves.append("down")
+    if object_position[position[0], position[1] - 1] == 0:
+        moves.append("left")
+    return moves
+
+
+def get_neighbors(object_position, position):
+    neighbors = []
+    possible = possible_moves(object_position, position)
+    for move in possible:
+        if move == "up":
+            neighbors.append((position[0]-1, position[1]))
+        elif move == "right":
+            neighbors.append((position[0], position[1]+1))
+        elif move == "down":
+            neighbors.append((position[0]+1, position[1]))
+        elif move == "left":
+            neighbors.append((position[0], position[1]-1))
+    return {"actions": possible, "neighbors": neighbors}
+
+
+def coin_bfs(object_position, coin_position, self_position):
+    """
+    Find path to nearest coin via breadth-first search (BFS)
+    :param object_position:
+    :param coin_position:
+    :param self_position:
+    :return:
+    """
+    q = []
+    explored = set()
+    # add start to the Queue
+    q.append(Node(state=self_position, parent=None, action=None))
+
+    # loop over the queue as long as it is not empty
+    while True:
+        if len(q) == 0:
+            raise Exception("no solution")
+
+        # always get first element
+        node = q.pop(0)
+
+        # found a coin, trace back to parent, but not if coin is where initial position is
+        if node.parent is not None and node.state in coin_position:
+            actions = []
+            cells = []
+            # Backtracking: From each node grab state and action; and then redefine node as parent node
+            while node.parent is not None:
+                actions.append(node.action)
+                cells.append(node.state)
+                node = node.parent
+            # Reverse is a method for lists that reverses the content
+            actions.reverse()
+            cells.reverse()
+            return actions, cells
+
+        explored.add(node.state)
+
+        # Add neighbors to frontier
+        neighbors = get_neighbors(object_position, node.state)
+        for action, neighbor in zip(neighbors["actions"], neighbors["neighbors"]):
+            if neighbor not in explored:
+                child = Node(state=neighbor, parent=node, action=action)
+                q.append(child)
+
+
+
 

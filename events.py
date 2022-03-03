@@ -23,3 +23,5 @@ SURVIVED_ROUND = 'SURVIVED_ROUND'
 MOVE_TO_COIN = "MOVE_TO_COIN"
 MOVE_FROM_COIN = "MOVE_FROM_COIN"
 
+# adding event to penalize staying in the same area for too long
+MOVE_IN_CIRCLES = "MOVE_IN_CIRCLES"

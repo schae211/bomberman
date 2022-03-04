@@ -12,7 +12,7 @@ ROWS = 17
 
 SCENARIOS = {
     # subtask 1
-    "coin-heaven": {
+    "coin_heaven": {
         "CRATE_DENSITY": 0,
         "COIN_COUNT": 40
     },

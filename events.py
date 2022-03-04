@@ -28,3 +28,7 @@ MOVE_IN_CIRCLES = "MOVE_IN_CIRCLES"
 
 # adding event to penalize suicide bombs
 SUICIDE_BOMB = "SUICIDE_BOMB"
+
+# escaping from bomb
+ESCAPE_FROM_BOMB = "ESCAPE_FROM_BOMB"
+STAY_IN_BOMB = "STAY_IN_BOMB"

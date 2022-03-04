@@ -29,9 +29,8 @@ ACTION_TRANSLATE_REV = {
 }
 
 # DEFAULT_PROBS = [.225, .225, .225, .225, .1, .0] # no bombs
-# DEFAULT_PROBS = [.2, .2, .2, .2, .1, .1]
 # DEFAULT_PROBS = [.15, .15, .15, .15, .1, .3]
-DEFAULT_PROBS = [.2, .2, .2, .2, .2, .2]
+DEFAULT_PROBS = [.2, .2, .2, .2, .1, .1]
 
 # Define option for policy: {"stochastic", "deterministic"}
 POLICY = "deterministic"
@@ -155,17 +154,19 @@ def state_to_features(game_state: dict) -> np.array:
 
     elif FEAT_ENG == "minimal":
 
-        # self position
-        s = np.array(game_state["self"][3])
+        # self position, basically needed for all features below
+        self_position = np.array(game_state["self"][3])
 
-        # also adding situational awareness, indicating in which directions the agent could move
+        # Situational awareness, indicating in which directions the agent could move
+        # TODO: Should we distinguish between walls and crates here?
         awareness = np.array([
-            game_state["field"][s[0] - 1, s[1]],    # up
-            game_state["field"][s[0], s[1] + 1],    # right
-            game_state["field"][s[0] + 1, s[1]],    # down
-            game_state["field"][s[0], s[1] - 1]     # left
+            game_state["field"][self_position[0] - 1, self_position[1]],    # up
+            game_state["field"][self_position[0], self_position[1] + 1],    # right
+            game_state["field"][self_position[0] + 1, self_position[1]],    # down
+            game_state["field"][self_position[0], self_position[1] - 1]     # left
         ])
         coins = game_state["coins"]
+        # check if there are still coins left, if not, do not perform BFS
         if len(coins) == 0:
             coin_direction = np.zeros(4)
         else:
@@ -183,7 +184,7 @@ def state_to_features(game_state: dict) -> np.array:
             elif coin_info[0][0] == "left":
                 coin_direction[3] += 1
 
-        # get information about affected areas
+        # get information about affected areas meaning where bombs are about to explode and where it is still dangerous
         explosion_map = game_state["explosion_map"].copy()
         bombs = game_state["bombs"].copy()
         for bomb_pos, bomb_ctd in bombs:
@@ -216,39 +217,65 @@ def state_to_features(game_state: dict) -> np.array:
                         break
                     else:
                         explosion_map[bomb_pos[0], right_y] += 1
-        # normalize explosion map
+        # normalize explosion map (since two bombs are not more dangerous than one bomb)
         explosion_map = np.where(explosion_map > 0, 1, 0)
 
-        # find the closest save spot
-        explosion_direction = np.zeros(4)
+        # find the closest save spot using once again BFS, ones indicate save spots
+        # we basically remove all the positions that are not returned by BFS indicating they are not the closest escape
+        explosion_direction = np.ones(5)
         if np.sum(explosion_map) > 0:
             explosion_info = save_bfs(object_position=game_state["field"], explosion_map=explosion_map,
                                       self_position=game_state["self"][3])
-            if explosion_info == ([], []):  # ([], []) is returned if already in save position
-                pass
-            elif explosion_info[0][0] == "up":
-                explosion_direction[0] += 1
-            elif explosion_info[0][0] == "right":
-                explosion_direction[1] += 1
-            elif explosion_info[0][0] == "down":
-                explosion_direction[2] += 1
-            elif explosion_info[0][0] == "left":
-                explosion_direction[3] += 1
+            if explosion_info != ([], []):  # current position
+                explosion_direction[0] -= 1
+            elif explosion_info[0][0] != "up":
+                explosion_direction[1] -= 1
+            elif explosion_info[0][0] != "right":
+                explosion_direction[2] -= 1
+            elif explosion_info[0][0] != "down":
+                explosion_direction[3] -= 1
+            elif explosion_info[0][0] != "left":
+                explosion_direction[4] -= 1
 
-        danger = np.array([explosion_map[s[0], s[1]],       # current position
-                           explosion_map[s[0]-1, s[1]],     # up
-                           explosion_map[s[0], s[1]+1],     # right
-                           explosion_map[s[0]+1, s[1]],     # down
-                           explosion_map[s[0], s[1]-1]])    # left
+        # add feature vector indicating whether the self position or the adjacent fields are dangerous
+        danger = np.array([explosion_map[self_position[0], self_position[1]],       # current position
+                           explosion_map[self_position[0]-1, self_position[1]],     # up
+                           explosion_map[self_position[0], self_position[1]+1],     # right
+                           explosion_map[self_position[0]+1, self_position[1]],     # down
+                           explosion_map[self_position[0], self_position[1]-1]])    # left
+
+        # add feature vector indicating in which direction to move to destroy the most tiles
+        # only consider if we can currently throw a bomb
+        crate_direction = np.zeros(5)
+        if game_state["self"][2]:
+            crate_info = crate_bfs(game_state["field"], game_state["self"][3])
+            if crate_info == ([], []):  # current position
+                crate_direction[0] += 1
+            elif crate_info[0][0] == "up":
+                crate_direction[1] += 1
+            elif crate_info[0][0] == "right":
+                crate_direction[2] += 1
+            elif crate_info[0][0] == "down":
+                crate_direction[3] += 1
+            elif crate_info[0][0] == "left":
+                crate_direction[4] += 1
 
         if explosion_map.sum() > 0:
             break_here = 0  # for debugging purposes, put condition above
 
-        features = np.concatenate([awareness, coin_direction, explosion_direction, danger])
+        features = np.concatenate([awareness, coin_direction, explosion_direction, danger, crate_direction])
         return features
 
 
-# define simple queue object that also allows checking for states
+# define simple node class used for BFS
+class Node(object):
+    def __init__(self, position, parent_position, move):
+        self.position = position
+        self.parent_position = parent_position
+        self.move = move
+
+
+# define simple queue class that also allows checking for states (which is an attribute of the node)
 class Queue(object):
     def __init__(self):
         self.fifo = []
@@ -257,7 +284,7 @@ class Queue(object):
         self.fifo.append(node)
 
     def contains_state(self, state):
-        return any(node.state == state for node in self.fifo)
+        return any(node.position == state for node in self.fifo)
 
     def empty(self):
         return len(self.fifo) == 0
@@ -268,13 +295,6 @@ class Queue(object):
         else:
             node = self.fifo.pop(0)
             return node
-
-
-class Node(object):
-    def __init__(self, state, parent, action):
-        self.state = state
-        self.parent = parent
-        self.action = action
 
 
 def possible_moves(object_position, position):
@@ -316,7 +336,7 @@ def coin_bfs(object_position, coin_position, self_position):
     q = Queue()
     explored = set()
     # add start to the Queue
-    q.put(Node(state=self_position, parent=None, action=None))
+    q.put(Node(position=self_position, parent_position=None, move=None))
 
     # loop over the queue as long as it is not empty
     while True:
@@ -327,40 +347,41 @@ def coin_bfs(object_position, coin_position, self_position):
         node = q.get()
 
         # found a coin, trace back to parent, but not if coin is where initial position is
-        if node.parent is not None and node.state in coin_position:
+        if node.parent_position is not None and node.position in coin_position:
             actions = []
             cells = []
             # Backtracking: From each node grab state and action; and then redefine node as parent node
-            while node.parent is not None:
-                actions.append(node.action)
-                cells.append(node.state)
-                node = node.parent
+            while node.parent_position is not None:
+                actions.append(node.move)
+                cells.append(node.position)
+                node = node.parent_position
             # Reverse is a method for lists that reverses the content
             actions.reverse()
             cells.reverse()
             return actions, cells
 
-        explored.add(node.state)
+        explored.add(node.position)
 
         # Add neighbors to frontier
-        neighbors = get_neighbors(object_position, node.state)
+        neighbors = get_neighbors(object_position, node.position)
         for action, neighbor in zip(neighbors["actions"], neighbors["neighbors"]):
             if neighbor not in explored and not q.contains_state(neighbor):
-                child = Node(state=neighbor, parent=node, action=action)
+                child = Node(position=neighbor, parent_position=node, move=action)
                 q.put(child)
 
 
 def save_bfs(object_position, explosion_map, self_position):
     """
     Find path to nearest save position via breadth-first search (BFS)
+    :param object_position:
     :param explosion_map:
-    :param self_position:
+    :param self_position
     :return:
     """
     q = Queue()
     explored = set()
     # add start to the Queue
-    q.put(Node(state=self_position, parent=None, action=None))
+    q.put(Node(position=self_position, parent_position=None, move=None))
 
     # loop over the queue as long as it is not empty
     while True:
@@ -371,26 +392,139 @@ def save_bfs(object_position, explosion_map, self_position):
         node = q.get()
 
         # found a save position
-        if explosion_map[node.state] == 0:
-            actions = []
+        if explosion_map[node.position] == 0:
+            moves = []
             cells = []
             # Backtracking: From each node grab state and action; and then redefine node as parent node
-            while node.parent is not None:
-                actions.append(node.action)
-                cells.append(node.state)
-                node = node.parent
+            while node.parent_position is not None:
+                moves.append(node.move)
+                cells.append(node.position)
+                node = node.parent_position
             # Reverse is a method for lists that reverses the order
-            actions.reverse()
+            moves.reverse()
             cells.reverse()
-            return actions, cells
+            return moves, cells
 
-        explored.add(node.state)
+        explored.add(node.position)
 
         # Add neighbors to frontier
-        neighbors = get_neighbors(object_position, node.state)
+        neighbors = get_neighbors(object_position, node.position)
         for action, neighbor in zip(neighbors["actions"], neighbors["neighbors"]):
             if neighbor not in explored and not q.contains_state(neighbor):
-                child = Node(state=neighbor, parent=node, action=action)
+                child = Node(position=neighbor, parent_position=node, move=action)
                 q.put(child)
 
+
+def crate_bfs(object_position, self_position, max_dist=12):
+    """
+    Find path to position where bomb destroys most crates via breadth-first search (BFS)
+    Thereby, we have to take the distance to the considered positions into consideration (trade-off!)
+    :param object_position:
+    :param self_position:
+    :return:
+    """
+    q = Queue()
+    explored = set()
+
+    # initialize maximum yet
+    top_considered_node = None
+    top_score = 0
+
+    # add start to the Queue
+    q.put(Node(position=self_position, parent_position=None, move=None))
+
+    # loop over the queue as long as it is not empty
+    while True:
+        # when empty we will trace the path to our top node
+        if q.empty():
+            # basically no target was found
+            if top_considered_node is None:
+                return None
+            else:
+                node = top_considered_node
+                moves = []
+                cells = []
+                # Backtracking: From each node grab state and action; and then redefine node as parent node
+                while node.parent_position is not None:
+                    moves.append(node.move)
+                    cells.append(node.position)
+                    node = node.parent_position
+                # Reverse is a method for lists that reverses the order
+                moves.reverse()
+                cells.reverse()
+                return moves, cells
+
+        # always get first element
+        node = q.get()
+
+        # compute distance to current position
+        dist_to_self = np.abs(np.array(node.position) - np.array(self_position)).sum()
+
+        # compute number of destroyed crates
+        destroyed_crates = get_destroyed_crates(object_position, node.position)
+
+        # TODO: Think about how to compute this destruction score
+        # combine distance and destroyed crates into a score
+        destruction_score = destroyed_crates - 0.5 * dist_to_self
+
+        # found a better position according to our destruction score
+        if destruction_score > top_score:
+            top_considered_node = node
+            top_score = destruction_score
+
+        explored.add(node.position)
+
+        # if too far away do not consider adding the neighbors!
+        if dist_to_self < max_dist:
+            # Add neighbors to queue
+            neighbors = get_neighbors(object_position, node.position)
+            for action, neighbor in zip(neighbors["actions"], neighbors["neighbors"]):
+                if neighbor not in explored and not q.contains_state(neighbor):
+                    child = Node(position=neighbor, parent_position=node, move=action)
+                    q.put(child)
+
+
+def get_destroyed_crates(object_position, bomb_position):
+    """
+    Compute the number of destroyed crates for a given bomb position
+    :param object_position: numpy 2D array: game_state["field"]
+    :param bomb_position: coordinate tuple (x,y)
+    :return: int: number of destroyed crates
+    """
+    destroyed_crates = 0
+    # check above
+    for up_x in range(bomb_position[0] - 1, bomb_position[0] - 4, -1):
+        if 0 <= up_x <= 16:
+            if object_position[up_x, bomb_position[1]] == -1:
+                break
+            else:
+                # if a crate is present at the position add to destroyed crates counter
+                if object_position[up_x, bomb_position[1]] == 1:
+                    destroyed_crates += 1
+    # check below
+    for down_x in range(bomb_position[0] + 1, bomb_position[0] + 4, 1):
+        if 0 <= down_x <= 16:
+            if object_position[down_x, bomb_position[1]] == -1:
+                break
+            else:
+                if object_position[down_x, bomb_position[1]] == 1:
+                    destroyed_crates += 1
+    # check to the left
+    for left_y in range(bomb_position[1] - 1, bomb_position[1] - 4, -1):
+        if 0 <= left_y <= 16:
+            if object_position[bomb_position[0], left_y] == -1:
+                break
+            else:
+                if object_position[bomb_position[0], left_y] == 1:
+                    destroyed_crates += 1
+    # check to the right
+    for right_y in range(bomb_position[1] + 1, bomb_position[1] + 4, 1):
+        if 0 <= right_y <= 16:
+            if object_position[bomb_position[0], right_y] == -1:
+                break
+            else:
+                if object_position[bomb_position[0], right_y] == 1:
+                    destroyed_crates += 1
+
+    return destroyed_crates
 

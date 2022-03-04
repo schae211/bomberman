@@ -13,7 +13,8 @@ ROWS = 17
 SCENARIOS = {
     # TODO: teak here
     "coin-heaven": {
-        "CRATE_DENSITY": 0,
+        # "CRATE_DENSITY": 0,
+        "CRATE_DENSITY": 0.5,
         # "COIN_COUNT": 6
         "COIN_COUNT": 50
 

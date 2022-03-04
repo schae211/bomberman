@@ -198,7 +198,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         immediate_reward = self.memory[i].reward
 
         # translate action to int
-        action = ACTION_TRANSLATE[self.memory[i].action]
+        action = ACTION_TRANSLATE[self.memory[i].move]
 
         # check whether state is none, which corresponds to the first state
         if self.memory[i].state is None:
@@ -318,7 +318,8 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
         e.WAITED: -1,
         e.MOVE_TO_COIN: 5,
         e.MOVE_FROM_COIN: -5,
-        e.MOVE_IN_CIRCLES: -2
+        e.MOVE_IN_CIRCLES: -2,
+        e.CRATE_DESTROYED: 5
         # e.KILLED_OPPONENT: 5 # not useful at the moment
     }
     reward_sum = 0

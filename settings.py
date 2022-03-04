@@ -11,13 +11,15 @@ ROWS = 17
 # ROWS = 7
 
 SCENARIOS = {
-    # TODO: teak here
+    # subtask 1
     "coin-heaven": {
-        # "CRATE_DENSITY": 0,
-        "CRATE_DENSITY": 0.25,
-        # "COIN_COUNT": 6
+        "CRATE_DENSITY": 0,
         "COIN_COUNT": 40
-
+    },
+    # subtask 2
+    "crate_heaven": {
+        "CRATE_DENSITY": 0.25,
+        "COIN_COUNT": 40
     },
     # This is the tournament game mode
     "classic": {

@@ -174,14 +174,15 @@ def state_to_features(game_state: dict) -> np.array:
                                  self_position=game_state["self"][3])
 
             coin_direction = np.zeros(4)
-            if coin_info[0][0] == "up":
-                coin_direction[0] += 1
-            elif coin_info[0][0] == "right":
-                coin_direction[1] += 1
-            elif coin_info[0][0] == "down":
-                coin_direction[2] += 1
-            elif coin_info[0][0] == "left":
-                coin_direction[3] += 1
+            if coin_info:                       # can we even reach the revealed coins?
+                if coin_info[0][0] == "up":
+                    coin_direction[0] += 1
+                elif coin_info[0][0] == "right":
+                    coin_direction[1] += 1
+                elif coin_info[0][0] == "down":
+                    coin_direction[2] += 1
+                elif coin_info[0][0] == "left":
+                    coin_direction[3] += 1
 
         # get information about affected areas meaning where bombs are about to explode and where it is still dangerous
         explosion_map = game_state["explosion_map"].copy()
@@ -249,16 +250,17 @@ def state_to_features(game_state: dict) -> np.array:
         # TODO: Should we only consider this if we can throw a bomb?
         crate_direction = np.zeros(5)
         crate_info = crate_bfs(game_state["field"], game_state["self"][3])
-        if crate_info == ([], []):  # current position
-            crate_direction[0] += 1
-        elif crate_info[0][0] == "up":
-            crate_direction[1] += 1
-        elif crate_info[0][0] == "right":
-            crate_direction[2] += 1
-        elif crate_info[0][0] == "down":
-            crate_direction[3] += 1
-        elif crate_info[0][0] == "left":
-            crate_direction[4] += 1
+        if crate_info:                          # check whether at all it makes sense to destroy crates now
+            if crate_info == ([], []):          # current position
+                crate_direction[0] += 1
+            elif crate_info[0][0] == "up":
+                crate_direction[1] += 1
+            elif crate_info[0][0] == "right":
+                crate_direction[2] += 1
+            elif crate_info[0][0] == "down":
+                crate_direction[3] += 1
+            elif crate_info[0][0] == "left":
+                crate_direction[4] += 1
 
         surviving_bomb = np.zeros(0)
         # get information about affected areas meaning where bombs are about to explode and where it is still dangerous
@@ -386,8 +388,9 @@ def coin_bfs(object_position, coin_position, self_position):
 
     # loop over the queue as long as it is not empty
     while True:
+        # if we cannot reach any revealed coin
         if q.empty():
-            raise Exception("no solution")
+            return None
 
         # always get first element
         node = q.get()

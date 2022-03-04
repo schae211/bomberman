@@ -41,7 +41,7 @@ GAMMA = 0.9
 EPSILON = 0.2
 
 # reducing epsilon over time
-EPSILON_REDUCTION = 0.99
+EPSILON_REDUCTION = 0.9
 
 # define minimum epsilon
 MIN_EPSILON = 0.05
@@ -296,15 +296,16 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
     # also check here whether there are still coins?
     if old_game_state and new_game_state and old_game_state["coins"] != []:
         coin_info = coin_bfs(old_game_state["field"], old_game_state["coins"], old_game_state["self"][3])
-        closest_coin = coin_info[1][-1]
-        next_move = coin_info[1][0]
-        old_distance = np.abs(np.array(old_game_state["self"][3]) - np.array(closest_coin)).sum()
-        new_distance = np.abs(np.array(new_game_state["self"][3]) - np.array(closest_coin)).sum()
-        # actually check that we are making the right move here
-        if new_game_state["self"][3] == next_move:
-            events.append(e.MOVE_TO_COIN)
-        elif new_distance > old_distance:
-            events.append(e.MOVE_FROM_COIN)
+        if coin_info is not None:           # check whether we can even reach any revealed coin
+            closest_coin = coin_info[1][-1]
+            next_move = coin_info[1][0]
+            old_distance = np.abs(np.array(old_game_state["self"][3]) - np.array(closest_coin)).sum()
+            new_distance = np.abs(np.array(new_game_state["self"][3]) - np.array(closest_coin)).sum()
+            # actually check that we are making the right move here
+            if new_game_state["self"][3] == next_move:
+                events.append(e.MOVE_TO_COIN)
+            elif new_distance > old_distance:
+                events.append(e.MOVE_FROM_COIN)
 
     # penalize if bomb was placed without escape route
     if old_game_state:
@@ -355,7 +356,7 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
             events.append(e.MOVE_IN_CIRCLES)
 
     game_rewards = {
-        e.COIN_COLLECTED: 40 * GAMMA ** step,  # discount the reward for collecting coins over time
+        e.COIN_COLLECTED: 100 * GAMMA ** step,  # discount the reward for collecting coins over time
         # e.COIN_COLLECTED: 40,
         e.KILLED_SELF: -200,
         e.INVALID_ACTION: -1,
@@ -363,8 +364,9 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
         e.MOVE_TO_COIN: 5,
         e.MOVE_FROM_COIN: -5,
         e.MOVE_IN_CIRCLES: -2,
-        e.CRATE_DESTROYED: 10,
-        e.SUICIDE_BOMB: -100
+        e.CRATE_DESTROYED: 20,
+        e.COIN_FOUND: 10,
+        e.SUICIDE_BOMB: -50
         # e.KILLED_OPPONENT: 5 # not useful at the moment
     }
     reward_sum = 0

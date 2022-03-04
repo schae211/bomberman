@@ -8,7 +8,7 @@ import random
 
 import events as e
 from .callbacks import state_to_features
-from .callbacks import Node, possible_moves, get_neighbors, coin_bfs
+from .callbacks import Node, possible_moves, get_neighbors, coin_bfs, save_bfs
 
 # a way to structure our code?
 Transition = namedtuple("Transition",
@@ -77,6 +77,7 @@ if SAVE_TRAIN:
 # global variable to store the last states
 LAST_STATES = 5
 
+
 def setup_training(self):
     """
     Initialise self for training purpose.
@@ -121,10 +122,10 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
     if old_game_state:
         rewards = reward_from_events(self, events, old_game_state, new_game_state)
         self.memory.append(Transition(old_game_state["round"],
-                                      state_to_features(old_game_state),                                    # state
-                                      self_action,                                                          # action
-                                      state_to_features(new_game_state),                                    # next_state
-                                      rewards))    # reward
+                                      state_to_features(old_game_state),  # state
+                                      self_action,  # action
+                                      state_to_features(new_game_state),  # next_state
+                                      rewards))  # reward
 
         # use global step information variable
         step_information["round"].append(old_game_state["round"])
@@ -144,6 +145,7 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
 
     # if True:
     #    events.append(PLACEHOLDER_EVENT)
+
 
 def end_of_round(self, last_game_state: dict, last_action: str, events: List[str]):
     """
@@ -198,7 +200,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         immediate_reward = self.memory[i].reward
 
         # translate action to int
-        action = ACTION_TRANSLATE[self.memory[i].move]
+        action = ACTION_TRANSLATE[self.memory[i].action]
 
         # check whether state is none, which corresponds to the first state
         if self.memory[i].state is None:
@@ -208,23 +210,23 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
             # get the reward of the N next steps, check that loop does not extend over length of memory
             rewards = []
-            loop_until = min(i+N, len(self.memory))  # Fixme: Does this still work with proper batches?
+            loop_until = min(i + N, len(self.memory))  # Fixme: Does this still work with proper batches?
             for t in range(i, loop_until):
                 # check whether we are still in the same episode
                 if self.memory[t].round == episode:
                     rewards.append(self.memory[t].reward)
 
-            gammas = [GAMMA**t for t in range(0, len(rewards))]
+            gammas = [GAMMA ** t for t in range(0, len(rewards))]
 
             # now multiply elementwise discounted gammas by the rewards and get the sum
             n_steps_reward = (np.array(rewards) * np.array(gammas)).sum()
 
             # if we have a terminal state in the next states we cannot predict q-values for it
-            if self.memory[len(rewards)-1].next_state is None:
+            if self.memory[len(rewards) - 1].next_state is None:
                 q_update = n_steps_reward
             else:
-                q_update = n_steps_reward + GAMMA**N * \
-                           np.amax(self.model.predict(self.memory[len(rewards)-1].next_state.reshape(1, -1)))
+                q_update = n_steps_reward + GAMMA ** N * \
+                           np.amax(self.model.predict(self.memory[len(rewards) - 1].next_state.reshape(1, -1)))
 
             # use the model to predict all the other q_values
             # (below we replace the q_value for the selected action with this q_update)
@@ -262,7 +264,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     global episode_information
     if last_game_state:
         episode_information["round"].append(last_game_state["round"])
-        TS_MSE = ((self.model.predict(x_reshaped) - y_reshaped)**2).mean(axis=0)
+        TS_MSE = ((self.model.predict(x_reshaped) - y_reshaped) ** 2).mean(axis=0)
         episode_information["TS_MSE_1"].append(TS_MSE[0])
         episode_information["TS_MSE_2"].append(TS_MSE[1])
         episode_information["TS_MSE_3"].append(TS_MSE[2])
@@ -304,6 +306,48 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
         elif new_distance > old_distance:
             events.append(e.MOVE_FROM_COIN)
 
+    # penalize if bomb was placed without escape route
+    if old_game_state:
+        # get information about affected areas meaning where bombs are about to explode and where it is still dangerous
+        explosion_map_2 = old_game_state["explosion_map"].copy()
+        bombs = old_game_state["bombs"].copy()
+        bombs.append((old_game_state["self"][3], 4))
+        for bomb_pos, bomb_ctd in bombs:
+            explosion_map_2[bomb_pos] += 1
+            # check above
+            for up_x in range(bomb_pos[0] - 1, bomb_pos[0] - 4, -1):
+                if 0 <= up_x <= 16:
+                    if old_game_state["field"][up_x, bomb_pos[1]] == -1:
+                        break
+                    else:
+                        explosion_map_2[up_x, bomb_pos[1]] += 1
+            # check below
+            for down_x in range(bomb_pos[0] + 1, bomb_pos[0] + 4, 1):
+                if 0 <= down_x <= 16:
+                    if old_game_state["field"][down_x, bomb_pos[1]] == -1:
+                        break
+                    else:
+                        explosion_map_2[down_x, bomb_pos[1]] += 1
+            # check to the left
+            for left_y in range(bomb_pos[1] - 1, bomb_pos[1] - 4, -1):
+                if 0 <= left_y <= 16:
+                    if old_game_state["field"][bomb_pos[0], left_y] == -1:
+                        break
+                    else:
+                        explosion_map_2[bomb_pos[0], left_y] += 1
+            # check to the right
+            for right_y in range(bomb_pos[1] + 1, bomb_pos[1] + 4, 1):
+                if 0 <= right_y <= 16:
+                    if old_game_state["field"][bomb_pos[0], right_y] == -1:
+                        break
+                    else:
+                        explosion_map_2[bomb_pos[0], right_y] += 1
+        # normalize explosion map (since two bombs are not more dangerous than one bomb)
+        explosion_map_2 = np.where(explosion_map_2 > 0, 1, 0)
+        if e.BOMB_DROPPED and save_bfs(object_position=old_game_state["field"], explosion_map=explosion_map_2,
+                                       self_position=old_game_state["self"][3]) == "dead":
+            events.append(e.SUICIDE_BOMB)
+
     # check whether agent stayed in the same spot for too long (3 out of 5?)
     if new_game_state:
         check_same_pos = np.array([state == new_game_state["self"][3] for state in self.last_state]).sum()
@@ -311,7 +355,7 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
             events.append(e.MOVE_IN_CIRCLES)
 
     game_rewards = {
-        e.COIN_COLLECTED: 40 * GAMMA**step,  # discount the reward for collecting coins over time
+        e.COIN_COLLECTED: 40 * GAMMA ** step,  # discount the reward for collecting coins over time
         # e.COIN_COLLECTED: 40,
         e.KILLED_SELF: -200,
         e.INVALID_ACTION: -1,
@@ -319,7 +363,8 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
         e.MOVE_TO_COIN: 5,
         e.MOVE_FROM_COIN: -5,
         e.MOVE_IN_CIRCLES: -2,
-        e.CRATE_DESTROYED: 5
+        e.CRATE_DESTROYED: 10,
+        e.SUICIDE_BOMB: -100
         # e.KILLED_OPPONENT: 5 # not useful at the moment
     }
     reward_sum = 0

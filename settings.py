@@ -14,9 +14,9 @@ SCENARIOS = {
     # TODO: teak here
     "coin-heaven": {
         # "CRATE_DENSITY": 0,
-        "CRATE_DENSITY": 0.5,
+        "CRATE_DENSITY": 0.25,
         # "COIN_COUNT": 6
-        "COIN_COUNT": 50
+        "COIN_COUNT": 40
 
     },
     # This is the tournament game mode

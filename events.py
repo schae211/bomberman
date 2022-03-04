@@ -25,3 +25,6 @@ MOVE_FROM_COIN = "MOVE_FROM_COIN"
 
 # adding event to penalize staying in the same area for too long
 MOVE_IN_CIRCLES = "MOVE_IN_CIRCLES"
+
+# adding event to penalize suicide bombs
+SUICIDE_BOMB = "SUICIDE_BOMB"

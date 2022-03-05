@@ -447,8 +447,8 @@ def save_bfs(object_position, explosion_map, self_position):
         # always get first element
         node = q.get()
 
-        # found a save position
-        if explosion_map[node.position] == 0:
+        # found a save position, either not danger or danger is already gone
+        if explosion_map[node.position] == 0 or (explosion_map[node.position] + (node.steps * 1/6)) > 1:
             moves = []
             cells = []
             # Backtracking: From each node grab state and action; and then redefine node as parent node

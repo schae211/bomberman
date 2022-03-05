@@ -49,12 +49,10 @@ def build_arena(COLS, ROWS, CRATE_DENSITY, COIN_COUNT, SEED):
 
     return arena, collectable_coins
 
-
-arena = build_arena(17, 17, 0.2, 50, 42)
-
-scenario = "2"
+scenario = "3"
 
 if scenario == "1":
+    arena = build_arena(17, 17, 0.2, 50, 42)
     game_state = {
         "round": 1,
         "step": 1,
@@ -65,13 +63,28 @@ if scenario == "1":
         "explosion_map": np.zeros_like(arena[0])
     }
 elif scenario == "2":
+    arena = build_arena(17, 17, 0.2, 50, 42)
+    arena[0][2, 1] = -1
     game_state = {
         "round": 1,
         "step": 1,
         "field": arena[0],
         "coins": arena[1],
-        "self": ("my_agent", 0, True, (1, 1)),
-        "bombs": [((1, 3), 3)],
+        "self": ("my_agent", 0, True, (1, 2)),
+        "bombs": [((1, 3), 4), ((4, 5), 4)],
+        "explosion_map": np.zeros_like(arena[0])
+    }
+
+# testing if bfs check that bomb danger is already gone
+elif scenario == "3":
+    arena = build_arena(17, 17, 0.2, 50, 42)
+    game_state = {
+        "round": 1,
+        "step": 1,
+        "field": arena[0],
+        "coins": arena[1],
+        "self": ("my_agent", 0, True, (1, 2)),
+        "bombs": [((1, 3), 4), ((2, 3), 4), ((4, 1), -1)],
         "explosion_map": np.zeros_like(arena[0])
     }
 

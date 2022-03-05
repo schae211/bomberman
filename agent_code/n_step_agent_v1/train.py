@@ -88,7 +88,7 @@ def setup_training(self):
     """
     # Set up an array that will keep track of transition tuples (s, a, r, s')
     self.memory = deque(maxlen=MEMORY_SIZE)
-    self.last_state = deque(maxlen=LAST_STATES)
+    self.last_states = deque(maxlen=LAST_STATES)
 
     # adding epsilon var to agent
     self.epsilon = EPSILON
@@ -134,7 +134,7 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
         step_information["reward"].append(rewards)
 
         # keep status of last N steps for reward shaping
-        self.last_state.append(old_game_state["self"][3])
+        self.last_states.append(old_game_state["self"][3])
 
     # first game state, can still be used by using the round information from the new game state
     elif new_game_state:
@@ -351,7 +351,7 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
 
     # check whether agent stayed in the same spot for too long (3 out of 5?)
     if new_game_state:
-        check_same_pos = np.array([state == new_game_state["self"][3] for state in self.last_state]).sum()
+        check_same_pos = np.array([state == new_game_state["self"][3] for state in self.last_states]).sum()
         if check_same_pos >= 3:
             events.append(e.MOVE_IN_CIRCLES)
 

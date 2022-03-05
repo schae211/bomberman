@@ -7,6 +7,7 @@ from sklearn.multioutput import MultiOutputRegressor
 from lightgbm import LGBMRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
+from numba import jit
 
 # helper lists and dictionaries
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
@@ -34,8 +35,8 @@ DEFAULT_PROBS = [.2, .2, .2, .2, .1, .1]
 # Define option for policy: {"stochastic", "deterministic"}
 POLICY = "deterministic"
 
-# Define option for feature engineering: {"channels", "minimal"}
-FEAT_ENG = "minimal"
+# Define option for feature engineering: {"channels", "standard", "minimal"}
+FEAT_ENG = "standard"
 
 
 def setup(self):
@@ -128,7 +129,7 @@ def state_to_features(game_state: dict) -> np.array:
     :param game_state:  A dictionary describing the current game board.
     :return: np.array
     """
-    # This is the dict before the game begins and after it ends
+    # This is the game_state dict before the game begins and after it ends
     if game_state is None:
         return None
 
@@ -151,19 +152,56 @@ def state_to_features(game_state: dict) -> np.array:
         # and return them as a vector
         return stacked_channels.reshape(-1)
 
+    elif FEAT_ENG == "standard":
+
+        # Situational awareness, indicating in which directions the agent can move
+        awareness = get_awareness(object_position=game_state["field"], self_position=game_state["self"][3])
+
+        # Direction to the closest coin determined by BFS
+        coin_direction = get_coin_direction(object_position=game_state["field"], coin_list=game_state["coins"],
+                                            self_position=game_state["self"][3])
+
+        # 2D array indicating which area is affected by exploded bombs or by bombs which are about to explode
+        explosion_map = get_bomb_map(object_position=game_state["field"], bomb_list=game_state["bombs"],
+                                     explosion_position=game_state["explosion_map"])
+
+        # 1D array indicating whether current field, up, right, down, left are dangerous
+        danger = get_danger(explosion_map=explosion_map, self_position=game_state["self"][3])
+
+        # 1D array indicating in which direction to flee from bomb if immediate danger
+        # if no immediate danger return 5 zeros or current spot is safe returns all zeros, otherwise direction
+        safe_direction = get_safe_direction(object_position=game_state["field"], explosion_map=explosion_map,
+                                            self_position=game_state["self"][3])
+
+        crate_direction = get_crate_direction(object_position=game_state["field"], explosion_map=explosion_map,
+                                              self_position=game_state["self"][3])
+
+        # 1D array indicating whether bomb can be dropped and survival is possible
+        bomb_info = get_bomb_info(object_position=game_state["field"], explosion_map=explosion_map,
+                                  self=game_state["self"])
+
+        features = np.concatenate([awareness,
+                                   danger,
+                                   safe_direction,
+                                   coin_direction,
+                                   crate_direction,
+                                   bomb_info])
+
+        return features
+
     elif FEAT_ENG == "minimal":
 
         # self position, basically needed for all features below
         self_position = np.array(game_state["self"][3])
 
-        # Situational awareness, indicating in which directions the agent could move
-        # TODO: Should we distinguish between walls and crates here?
+        # Situational awareness, indicating in which directions the agent can move
         awareness = np.array([
             game_state["field"][self_position[0] - 1, self_position[1]],  # up
             game_state["field"][self_position[0], self_position[1] + 1],  # right
             game_state["field"][self_position[0] + 1, self_position[1]],  # down
             game_state["field"][self_position[0], self_position[1] - 1]  # left
         ])
+
         coins = game_state["coins"]
         # check if there are revealed coins
         # there are 4 possibilities (up, right, down, left), so we need a vector of length 2
@@ -243,10 +281,10 @@ def state_to_features(game_state: dict) -> np.array:
                 explosion_direction[1] -= 1
 
         # add feature vector indicating whether the self position or the adjacent fields are dangerous
-        danger = np.array([explosion_map[self_position[0], self_position[1]],       # current position
-                           explosion_map[self_position[0] - 1, self_position[1]],   # up
-                           explosion_map[self_position[0], self_position[1] + 1],   # right
-                           explosion_map[self_position[0] + 1, self_position[1]],   # down
+        danger = np.array([explosion_map[self_position[0], self_position[1]],  # current position
+                           explosion_map[self_position[0] - 1, self_position[1]],  # up
+                           explosion_map[self_position[0], self_position[1] + 1],  # right
+                           explosion_map[self_position[0] + 1, self_position[1]],  # down
                            explosion_map[self_position[0], self_position[1] - 1]])  # left
 
         # add feature vector indicating in which direction to move to destroy the most tiles
@@ -266,10 +304,11 @@ def state_to_features(game_state: dict) -> np.array:
             elif crate_info[0][0] == "left":
                 crate_direction[1] -= 1
 
-        surviving_bomb = np.array(check_survival(game_state["field"], explosion_map, game_state["self"][3])[0]).reshape(-1)
+        surviving_bomb = np.array(check_survival(game_state["field"], explosion_map, game_state["self"][3])[0]).reshape(
+            -1)
 
         if explosion_map.sum() > 0:
-             break_here = 0  # for debugging purposes, put condition above
+            break_here = 0  # for debugging purposes, put condition above
 
         features = np.concatenate([awareness,
                                    coin_direction,
@@ -432,10 +471,12 @@ def save_bfs(object_position, explosion_map, self_position):
 
 # reduce default dist to make computations faster
 # TODO: Improve performance here
-def crate_bfs(object_position, self_position, explosion_map, max_dist=6):
+def crate_bfs(object_position, self_position, explosion_map, max_dist=10):
     """
     Find path to position where bomb destroys most crates via breadth-first search (BFS)
     Thereby, we have to take the distance to the considered positions into consideration (trade-off!)
+    :param explosion_map:
+    :param max_dist:
     :param object_position:
     :param self_position:
     :return:
@@ -474,11 +515,11 @@ def crate_bfs(object_position, self_position, explosion_map, max_dist=6):
         # always get first element
         node = q.get()
 
-        # only consider if escaping is possible at the current position
-        if check_survival(object_position, explosion_map, node.position)[0] == 1:
+        # compute distance to current position
+        dist_to_self = np.abs(np.array(node.position) - np.array(self_position)).sum()
 
-            # compute distance to current position
-            dist_to_self = np.abs(np.array(node.position) - np.array(self_position)).sum()
+        # only consider if escaping is possible at the current position
+        if check_survival(object_position, explosion_map, node.position):
 
             # compute number of destroyed crates
             destroyed_crates = get_destroyed_crates(object_position, node.position)
@@ -587,8 +628,141 @@ def check_survival(object_position, explosion_map, position):
     check = save_bfs(object_position=object_position, explosion_map=updated_explosion_map,
                      self_position=position)
     if check != "dead":
-        return 1, len(check[0])
+        return True
     else:
-        return -1
+        return False
+
+
+def get_awareness(object_position, self_position):
+    return np.array([
+        object_position[self_position[0] - 1, self_position[1]],  # up
+        object_position[self_position[0], self_position[1] + 1],  # right
+        object_position[self_position[0] + 1, self_position[1]],  # down
+        object_position[self_position[0], self_position[1] - 1]  # left
+    ]) == 0
+
+
+def get_coin_direction(object_position, coin_list, self_position):
+    # if no coins revealed return all 0
+    if len(coin_list) == 0:
+        return np.zeros(4)
+
+    # perform BFS to find the nearest coin
+    coin_info = coin_bfs(object_position=object_position, coin_position=coin_list,
+                         self_position=self_position)
+
+    coin_direction = np.zeros(4)
+    if coin_info is not None:  # can we even reach the revealed coins? due to walls/crates it may be impossible
+        if coin_info[0][0] == "up":
+            coin_direction[0] = 1
+        elif coin_info[0][0] == "right":
+            coin_direction[1] = 1
+        elif coin_info[0][0] == "down":
+            coin_direction[2] = 1
+        elif coin_info[0][0] == "left":
+            coin_direction[3] = 1
+    return coin_direction
+
+
+def get_bomb_map(object_position, bomb_list, explosion_position):
+    # get information about affected areas meaning where bombs are about to explode and where it is still dangerous
+    # TODO: Consider adding countdown information
+    explosion_map = explosion_position.copy()
+    bombs = bomb_list.copy()
+    for bomb_pos, _ in bombs:
+        # position of the bomb itself
+        explosion_map[bomb_pos] += 1
+        # check above
+        for up_x in range(bomb_pos[0] - 1, bomb_pos[0] - 4, -1):
+            if 0 <= up_x <= 16:
+                if object_position[up_x, bomb_pos[1]] == -1:
+                    break
+                else:
+                    explosion_map[up_x, bomb_pos[1]] += 1
+        # check below
+        for down_x in range(bomb_pos[0] + 1, bomb_pos[0] + 4, 1):
+            if 0 <= down_x <= 16:
+                if object_position[down_x, bomb_pos[1]] == -1:
+                    break
+                else:
+                    explosion_map[down_x, bomb_pos[1]] += 1
+        # check to the left
+        for left_y in range(bomb_pos[1] - 1, bomb_pos[1] - 4, -1):
+            if 0 <= left_y <= 16:
+                if object_position[bomb_pos[0], left_y] == -1:
+                    break
+                else:
+                    explosion_map[bomb_pos[0], left_y] += 1
+        # check to the right
+        for right_y in range(bomb_pos[1] + 1, bomb_pos[1] + 4, 1):
+            if 0 <= right_y <= 16:
+                if object_position[bomb_pos[0], right_y] == -1:
+                    break
+                else:
+                    explosion_map[bomb_pos[0], right_y] += 1
+
+    # normalize explosion map (since two bombs are not more dangerous than one bomb)
+    return np.where(explosion_map > 0, 1, 0)
+
+
+def get_danger(explosion_map, self_position):
+    return np.array([explosion_map[self_position[0], self_position[1]],         # current position
+                     explosion_map[self_position[0] - 1, self_position[1]],     # up
+                     explosion_map[self_position[0], self_position[1] + 1],     # right
+                     explosion_map[self_position[0] + 1, self_position[1]],     # down
+                     explosion_map[self_position[0], self_position[1] - 1]])    # left
+
+
+def get_safe_direction(object_position, explosion_map, self_position):
+    if explosion_map[self_position[0], self_position[1]] == 0:
+        return np.zeros(5)
+
+    safe_direction = np.zeros(5)
+    explosion_info = save_bfs(object_position=object_position, explosion_map=explosion_map,
+                              self_position=self_position)
+    if explosion_info == "dead":            # no safe position at all detected, sure death
+        safe_direction[0] = 1
+    #elif explosion_info == ([], []):       # should not happen since we check above for immediate danger
+    #    pass
+    elif explosion_info[0][0] == "up":      # up is safe
+        safe_direction[1] = 1
+    elif explosion_info[0][0] == "right":   # right is safe
+        safe_direction[2] = 1
+    elif explosion_info[0][0] == "down":    # down is safe
+        safe_direction[3] = 1
+    elif explosion_info[0][0] == "left":    # left is safe
+        safe_direction[4] = 1
+
+    return safe_direction
+
+
+def get_crate_direction(object_position, explosion_map, self_position):
+    crate_direction = np.zeros(5)
+    crate_info = crate_bfs(object_position, self_position, explosion_map)
+
+    if crate_info is not None:  # None is returned if destruction score was negative for all considered positions
+        crate_direction[0] = 1              # indicating that target was found
+        if crate_info == ([], []):          # current position
+            pass
+        elif crate_info[0][0] == "up":
+            crate_direction[1] = 1
+        elif crate_info[0][0] == "right":
+            crate_direction[2] = 1
+        elif crate_info[0][0] == "down":
+            crate_direction[3] = 1
+        elif crate_info[0][0] == "left":
+            crate_direction[4] = 1
+
+    return crate_direction
+
+
+def get_bomb_info(object_position, explosion_map, self):
+    bomb_info = np.zeros(2)
+    # check if bomb action is possible
+    if self[2]:
+        bomb_info[0] = 1
+    if check_survival(object_position, explosion_map, self[3]):
+        bomb_info[1] = 1
+    return bomb_info
 
 

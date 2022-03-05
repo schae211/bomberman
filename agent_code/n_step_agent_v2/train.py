@@ -9,6 +9,7 @@ import random
 import events as e
 from .callbacks import state_to_features
 from .callbacks import Node, possible_moves, get_neighbors, coin_bfs, save_bfs
+from .callbacks import get_bomb_map
 
 # a way to structure our code?
 Transition = namedtuple("Transition",
@@ -41,13 +42,13 @@ GAMMA = 0.9
 EPSILON = 0.2
 
 # reducing epsilon over time
-EPSILON_REDUCTION = 0.9
+EPSILON_REDUCTION = 0.95
 
 # define minimum epsilon
 MIN_EPSILON = 0.05
 
 # n-step temporal difference learning
-N = 6
+N = 8
 
 # memory size "experience buffer", if I fit the model only after each episode a large memory size should be fine
 # i think this parameter effectively determines how fast I can train the model (i.e. how long each round takes)
@@ -64,7 +65,7 @@ RECORD_ENEMY_TRANSITIONS = 1.0  # record enemy transitions with probability ...
 AUGMENT = False
 
 # Needed for augmenting training data
-GAME_SIZE = 7
+GAME_SIZE = 17
 
 # specify argument whether training statistics should be saved
 SAVE_TRAIN = True
@@ -88,7 +89,7 @@ def setup_training(self):
     """
     # Set up an array that will keep track of transition tuples (s, a, r, s')
     self.memory = deque(maxlen=MEMORY_SIZE)
-    self.last_state = deque(maxlen=LAST_STATES)
+    self.last_states = deque(maxlen=LAST_STATES)
 
     # adding epsilon var to agent
     self.epsilon = EPSILON
@@ -134,7 +135,7 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
         step_information["reward"].append(rewards)
 
         # keep status of last N steps for reward shaping
-        self.last_state.append(old_game_state["self"][3])
+        self.last_states.append(old_game_state["self"][3])
 
     # first game state, can still be used by using the round information from the new game state
     elif new_game_state:
@@ -292,8 +293,7 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
     else:
         step = old_game_state["step"]
 
-    # add reward/penalty based on whether the agent moved towards/away from the nearest coin
-    # also check here whether there are still coins?
+    # add reward/penalty based on whether the agent moved towards/away from the nearest coin (if coins were visible)
     if old_game_state and new_game_state and old_game_state["coins"] != []:
         coin_info = coin_bfs(old_game_state["field"], old_game_state["coins"], old_game_state["self"][3])
         if coin_info is not None:           # check whether we can even reach any revealed coin
@@ -308,46 +308,14 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
 
     # reward/penalize if escaping/running into bomb
     if old_game_state and new_game_state and old_game_state["bombs"] != []:
-        explosion_map = old_game_state["explosion_map"].copy()
-        bombs = old_game_state["bombs"].copy()
-        for bomb_pos, bomb_ctd in bombs:
-            explosion_map[bomb_pos] += 1
-            # check above
-            for up_x in range(bomb_pos[0] - 1, bomb_pos[0] - 4, -1):
-                if 0 <= up_x <= 16:
-                    if old_game_state["field"][up_x, bomb_pos[1]] == -1:
-                        break
-                    else:
-                        explosion_map[up_x, bomb_pos[1]] += 1
-            # check below
-            for down_x in range(bomb_pos[0] + 1, bomb_pos[0] + 4, 1):
-                if 0 <= down_x <= 16:
-                    if old_game_state["field"][down_x, bomb_pos[1]] == -1:
-                        break
-                    else:
-                        explosion_map[down_x, bomb_pos[1]] += 1
-            # check to the left
-            for left_y in range(bomb_pos[1] - 1, bomb_pos[1] - 4, -1):
-                if 0 <= left_y <= 16:
-                    if old_game_state["field"][bomb_pos[0], left_y] == -1:
-                        break
-                    else:
-                        explosion_map[bomb_pos[0], left_y] += 1
-            # check to the right
-            for right_y in range(bomb_pos[1] + 1, bomb_pos[1] + 4, 1):
-                if 0 <= right_y <= 16:
-                    if old_game_state["field"][bomb_pos[0], right_y] == -1:
-                        break
-                    else:
-                        explosion_map[bomb_pos[0], right_y] += 1
-        explosion_map = np.where(explosion_map > 0, 1, 0)
+        explosion_map = get_bomb_map(old_game_state["field"], old_game_state["bombs"], old_game_state["explosion_map"])
+        # check if old position is in danger zone in explosion map
         explosion_info = save_bfs(object_position=old_game_state["field"], explosion_map=explosion_map,
                                   self_position=old_game_state["self"][3])
-        if explosion_info != ([], []):  # if the old position is not safe
+        if explosion_info != ([], []):                  # if the old position is not safe
             closest_save_spot = explosion_info[1][-1]
             next_move = explosion_info[1][0]
-            # actually check that we are making the right move here
-            if new_game_state["self"][3] == next_move:
+            if new_game_state["self"][3] == next_move:  # if we did make the move suggested by bfs
                 events.append(e.ESCAPE_FROM_BOMB)
             else:
                 events.append(e.STAY_IN_BOMB)
@@ -355,62 +323,59 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
     # penalize if bomb was placed without escape route
     if old_game_state and e.BOMB_DROPPED:
         # get information about affected areas meaning where bombs are about to explode and where it is still dangerous
-        explosion_map_2 = old_game_state["explosion_map"].copy()
-        bombs = old_game_state["bombs"].copy()
-        bombs.append((old_game_state["self"][3], 4))
-        for bomb_pos, bomb_ctd in bombs:
-            explosion_map_2[bomb_pos] += 1
-            # check above
-            for up_x in range(bomb_pos[0] - 1, bomb_pos[0] - 4, -1):
-                if 0 <= up_x <= 16:
-                    if old_game_state["field"][up_x, bomb_pos[1]] == -1:
-                        break
-                    else:
-                        explosion_map_2[up_x, bomb_pos[1]] += 1
-            # check below
-            for down_x in range(bomb_pos[0] + 1, bomb_pos[0] + 4, 1):
-                if 0 <= down_x <= 16:
-                    if old_game_state["field"][down_x, bomb_pos[1]] == -1:
-                        break
-                    else:
-                        explosion_map_2[down_x, bomb_pos[1]] += 1
-            # check to the left
-            for left_y in range(bomb_pos[1] - 1, bomb_pos[1] - 4, -1):
-                if 0 <= left_y <= 16:
-                    if old_game_state["field"][bomb_pos[0], left_y] == -1:
-                        break
-                    else:
-                        explosion_map_2[bomb_pos[0], left_y] += 1
-            # check to the right
-            for right_y in range(bomb_pos[1] + 1, bomb_pos[1] + 4, 1):
-                if 0 <= right_y <= 16:
-                    if old_game_state["field"][bomb_pos[0], right_y] == -1:
-                        break
-                    else:
-                        explosion_map_2[bomb_pos[0], right_y] += 1
-            # normalize explosion map (since two bombs are not more dangerous than one bomb)
-            explosion_map_2 = np.where(explosion_map_2 > 0, 1, 0)
-            if save_bfs(object_position=old_game_state["field"], explosion_map=explosion_map_2,
-                        self_position=old_game_state["self"][3]) == "dead":
-                events.append(e.SUICIDE_BOMB)
+        explosion_map = get_bomb_map(old_game_state["field"], old_game_state["bombs"], old_game_state["explosion_map"])
+        bomb_position = old_game_state["self"][3]
+        explosion_map[bomb_position] += 1
+        # check above
+        for up_x in range(bomb_position[0] - 1, bomb_position[0] - 4, -1):
+            if 0 <= up_x <= 16:
+                if old_game_state["field"][up_x, bomb_position[1]] == -1:
+                    break
+                else:
+                    explosion_map[up_x, bomb_position[1]] += 1
+        # check below
+        for down_x in range(bomb_position[0] + 1, bomb_position[0] + 4, 1):
+            if 0 <= down_x <= 16:
+                if old_game_state["field"][down_x, bomb_position[1]] == -1:
+                    break
+                else:
+                    explosion_map[down_x, bomb_position[1]] += 1
+        # check to the left
+        for left_y in range(bomb_position[1] - 1, bomb_position[1] - 4, -1):
+            if 0 <= left_y <= 16:
+                if old_game_state["field"][bomb_position[0], left_y] == -1:
+                    break
+                else:
+                    explosion_map[bomb_position[0], left_y] += 1
+        # check to the right
+        for right_y in range(bomb_position[1] + 1, bomb_position[1] + 4, 1):
+            if 0 <= right_y <= 16:
+                if old_game_state["field"][bomb_position[0], right_y] == -1:
+                    break
+                else:
+                    explosion_map[bomb_position[0], right_y] += 1
+        explosion_map = np.where(explosion_map > 0, 1, 0)
+        if save_bfs(object_position=old_game_state["field"], explosion_map=explosion_map,
+                    self_position=old_game_state["self"][3]) == "dead":
+            events.append(e.SUICIDE_BOMB)
 
-    # check whether agent stayed in the same spot for too long (3 out of 5?)
+    # check whether agent stayed in the same spot for too long (3 out of 5)
     if new_game_state:
-        check_same_pos = np.array([state == new_game_state["self"][3] for state in self.last_state]).sum()
+        check_same_pos = np.array([state == new_game_state["self"][3] for state in self.last_states]).sum()
         if check_same_pos >= 3:
             events.append(e.MOVE_IN_CIRCLES)
 
     game_rewards = {
         # e.COIN_COLLECTED: 100 * GAMMA ** step,  # discount the reward for collecting coins over time
-        e.COIN_COLLECTED: 50,
-        e.KILLED_SELF: -200,
+        e.COIN_COLLECTED: 40,
+        e.KILLED_SELF: -100,
         e.INVALID_ACTION: -2,
-        e.WAITED: -0.5,
+        e.WAITED: -1.5,
         e.MOVE_TO_COIN: 5,
         e.MOVE_FROM_COIN: -5,
         e.MOVE_IN_CIRCLES: -2,
-        e.CRATE_DESTROYED: 15,
-        e.SUICIDE_BOMB: -100,
+        e.CRATE_DESTROYED: 20,
+        #e.SUICIDE_BOMB: -100,
         e.ESCAPE_FROM_BOMB: 10,
         e.STAY_IN_BOMB: -10
         # e.KILLED_OPPONENT: 5 # not useful at the moment

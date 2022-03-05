@@ -323,10 +323,11 @@ def state_to_features(game_state: dict) -> np.array:
 
 # define simple node class used for BFS
 class Node(object):
-    def __init__(self, position, parent_position, move):
+    def __init__(self, position, parent_position, move, steps=None):
         self.position = position
         self.parent_position = parent_position
         self.move = move
+        self.steps = steps
 
 
 # define simple queue class that also allows checking for states (which is an attribute of the node)
@@ -436,7 +437,7 @@ def save_bfs(object_position, explosion_map, self_position):
     q = Queue()
     explored = set()
     # add start to the Queue
-    q.put(Node(position=self_position, parent_position=None, move=None))
+    q.put(Node(position=self_position, parent_position=None, move=None, steps=0))
 
     # loop over the queue as long as it is not empty
     while True:
@@ -466,7 +467,8 @@ def save_bfs(object_position, explosion_map, self_position):
         neighbors = get_neighbors(object_position, node.position)
         for action, neighbor in zip(neighbors["actions"], neighbors["neighbors"]):
             if neighbor not in explored and not q.contains_state(neighbor):
-                child = Node(position=neighbor, parent_position=node, move=action)
+                # TODO: Check whether steps is really always + 1, but should make sense in BFS
+                child = Node(position=neighbor, parent_position=node, move=action, steps=node.steps+1)
                 q.put(child)
 
 
@@ -668,42 +670,45 @@ def get_coin_direction(object_position, coin_list, self_position):
 def get_bomb_map(object_position, bomb_list, explosion_position):
     # get information about affected areas meaning where bombs are about to explode and where it is still dangerous
     # TODO: Consider adding countdown information
-    explosion_map = explosion_position.copy()
+    explosion_map = explosion_position.copy().astype(float)
+    ctd_to_score = lambda ctd : 5/6 - (1/6 * ctd)
+    if len(bomb_list) > 0:
+        break_here = 0
     bombs = bomb_list.copy()
-    for bomb_pos, _ in bombs:
+    for bomb_pos, bomb_ctd in bombs:
         # position of the bomb itself
-        explosion_map[bomb_pos] += 1
+        explosion_map[bomb_pos] = max(explosion_map[bomb_pos], ctd_to_score(bomb_ctd))
         # check above
         for up_x in range(bomb_pos[0] - 1, bomb_pos[0] - 4, -1):
             if 0 <= up_x <= 16:
                 if object_position[up_x, bomb_pos[1]] == -1:
                     break
                 else:
-                    explosion_map[up_x, bomb_pos[1]] += 1
+                    explosion_map[up_x, bomb_pos[1]] = max(explosion_map[up_x, bomb_pos[1]], ctd_to_score(bomb_ctd))
         # check below
         for down_x in range(bomb_pos[0] + 1, bomb_pos[0] + 4, 1):
             if 0 <= down_x <= 16:
                 if object_position[down_x, bomb_pos[1]] == -1:
                     break
                 else:
-                    explosion_map[down_x, bomb_pos[1]] += 1
+                    explosion_map[down_x, bomb_pos[1]] = max(explosion_map[down_x, bomb_pos[1]], ctd_to_score(bomb_ctd))
         # check to the left
         for left_y in range(bomb_pos[1] - 1, bomb_pos[1] - 4, -1):
             if 0 <= left_y <= 16:
                 if object_position[bomb_pos[0], left_y] == -1:
                     break
                 else:
-                    explosion_map[bomb_pos[0], left_y] += 1
+                    explosion_map[bomb_pos[0], left_y] = max(explosion_map[bomb_pos[0], left_y], ctd_to_score(bomb_ctd))
         # check to the right
         for right_y in range(bomb_pos[1] + 1, bomb_pos[1] + 4, 1):
             if 0 <= right_y <= 16:
                 if object_position[bomb_pos[0], right_y] == -1:
                     break
                 else:
-                    explosion_map[bomb_pos[0], right_y] += 1
+                    explosion_map[bomb_pos[0], right_y] = max(explosion_map[bomb_pos[0], right_y], ctd_to_score(bomb_ctd))
 
     # normalize explosion map (since two bombs are not more dangerous than one bomb)
-    return np.where(explosion_map > 0, 1, 0)
+    return explosion_map
 
 
 def get_danger(explosion_map, self_position):

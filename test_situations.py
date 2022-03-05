@@ -52,15 +52,28 @@ def build_arena(COLS, ROWS, CRATE_DENSITY, COIN_COUNT, SEED):
 
 arena = build_arena(17, 17, 0.2, 50, 42)
 
-game_state = {
-    "round": 1,
-    "step": 1,
-    "field": arena[0],
-    "coins": arena[1],
-    "self": ("my_agent", 0, True, (1, 1)),
-    "bombs": [((3, 3), 4)],
-    "explosion_map": np.zeros_like(arena[0])
-}
+scenario = "2"
+
+if scenario == "1":
+    game_state = {
+        "round": 1,
+        "step": 1,
+        "field": arena[0],
+        "coins": arena[1],
+        "self": ("my_agent", 0, True, (1, 1)),
+        "bombs": [((3, 3), 3), ((1, 1), 0)],
+        "explosion_map": np.zeros_like(arena[0])
+    }
+elif scenario == "2":
+    game_state = {
+        "round": 1,
+        "step": 1,
+        "field": arena[0],
+        "coins": arena[1],
+        "self": ("my_agent", 0, True, (1, 1)),
+        "bombs": [((1, 3), 3)],
+        "explosion_map": np.zeros_like(arena[0])
+    }
 
 print_field(game_state=game_state)
 

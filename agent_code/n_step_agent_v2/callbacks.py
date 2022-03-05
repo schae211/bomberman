@@ -155,6 +155,7 @@ def state_to_features(game_state: dict) -> np.array:
     elif FEAT_ENG == "standard":
 
         # Situational awareness, indicating in which directions the agent can move
+        # Add is bomb action possible?
         awareness = get_awareness(object_position=game_state["field"], self_position=game_state["self"][3])
 
         # Direction to the closest coin determined by BFS
@@ -486,7 +487,7 @@ def crate_bfs(object_position, self_position, explosion_map, max_dist=10):
 
     # initialize maximum yet
     top_considered_node = None
-    top_score = 0
+    top_score = -np.inf
 
     # add start to the Queue
     q.put(Node(position=self_position, parent_position=None, move=None))
@@ -524,9 +525,9 @@ def crate_bfs(object_position, self_position, explosion_map, max_dist=10):
             # compute number of destroyed crates
             destroyed_crates = get_destroyed_crates(object_position, node.position)
 
-            # TODO: Think about how to compute this destruction score
+            # TODO: Think about how to compute this destruction score, taking 1/4 because bomb takes 4 steps to explode
             # combine distance and destroyed crates into a score
-            destruction_score = destroyed_crates - 0.5 * dist_to_self
+            destruction_score = destroyed_crates - 1/4 * dist_to_self
 
             # found a better position according to our destruction score
             if destruction_score > top_score:
@@ -638,7 +639,7 @@ def get_awareness(object_position, self_position):
         object_position[self_position[0] - 1, self_position[1]],  # up
         object_position[self_position[0], self_position[1] + 1],  # right
         object_position[self_position[0] + 1, self_position[1]],  # down
-        object_position[self_position[0], self_position[1] - 1]  # left
+        object_position[self_position[0], self_position[1] - 1]   # left
     ]) == 0
 
 

@@ -48,14 +48,14 @@ EPSILON_REDUCTION = 0.95
 MIN_EPSILON = 0.05
 
 # n-step temporal difference learning
-N = 8
+N = 10
 
 # memory size "experience buffer", if I fit the model only after each episode a large memory size should be fine
 # i think this parameter effectively determines how fast I can train the model (i.e. how long each round takes)
 MEMORY_SIZE = 10000
 
 # what batch size should we use, and should we sample randomly or prioritize?
-BATCH_SIZE = 400
+BATCH_SIZE = 2000
 
 # what is this for?
 RECORD_ENEMY_TRANSITIONS = 1.0  # record enemy transitions with probability ...
@@ -123,10 +123,10 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
     if old_game_state:
         rewards = reward_from_events(self, events, old_game_state, new_game_state)
         self.memory.append(Transition(old_game_state["round"],
-                                      state_to_features(old_game_state),  # state
-                                      self_action,  # action
-                                      state_to_features(new_game_state),  # next_state
-                                      rewards))  # reward
+                                      state_to_features(old_game_state),    # state
+                                      self_action,                          # action
+                                      state_to_features(new_game_state),    # next_state
+                                      rewards))                             # reward
 
         # use global step information variable
         step_information["round"].append(old_game_state["round"])
@@ -186,6 +186,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     x = []
     y = []
 
+    # TODO: Prioritized Replay
     # get a batch -> using batches might be helpful to not get stuck in bad games...
     if len(self.memory) > BATCH_SIZE:
         batch = random.sample(range(len(self.memory)), BATCH_SIZE)
@@ -211,7 +212,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
             # get the reward of the N next steps, check that loop does not extend over length of memory
             rewards = []
-            loop_until = min(i + N, len(self.memory))  # Fixme: Does this still work with proper batches?
+            loop_until = min(i + N, len(self.memory))  # prevent index out of range error
             for t in range(i, loop_until):
                 # check whether we are still in the same episode
                 if self.memory[t].round == episode:

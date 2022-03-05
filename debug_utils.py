@@ -1,6 +1,34 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+feature_description = [
+    "awareness_up",
+    "awareness_right",
+    "awareness_down",
+    "awareness_left",
+    "danger_current",
+    "danger_up",
+    "danger_right",
+    "danger_down",
+    "danger_left",
+    "safe_direction_none",
+    "safe_direction_up",
+    "safe_direction_right",
+    "safe_direction_down",
+    "safe_direction_left",
+    "coin_direction_up",
+    "coin_direction_right",
+    "coin_direction_down",
+    "coin_direction_left",
+    "crate_direction_current",
+    "crate_direction_up",
+    "crate_direction_right",
+    "crate_direction_down",
+    "crate_direction_left",
+    "bomb_info_bomb_possible",
+    "bomb_info_survival_possible"
+]
+
 def translate_standard_features(features):
     return {
         "awareness_up": features[0],
@@ -53,6 +81,7 @@ def print_field(game_state):
         bomb_map[x, y] = 0.5
 
     game_map += bomb_map
+    coin_map += bomb_map
 
     channels = np.stack([game_map, coin_map, self_map])
     channels = np.moveaxis(channels, 0, -1)

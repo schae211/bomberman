@@ -2,8 +2,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from items import Coin
-from debug_utils import print_field
-from agent_code.n_step_agent_v2.callbacks import get_coin_direction, get_bomb_map
+from debug_utils import *
+from agent_code.n_step_agent_v2.callbacks import *
 
 
 def build_arena(COLS, ROWS, CRATE_DENSITY, COIN_COUNT, SEED):
@@ -64,13 +64,44 @@ game_state = {
 
 print_field(game_state=game_state)
 
+# Situational awareness, indicating in which directions the agent can move
+# Add is bomb action possible?
+awareness = get_awareness(object_position=game_state["field"], self_position=game_state["self"][3])
 
-coin_direction = get_coin_direction(game_state["field"], game_state["coins"], game_state["self"][3])
+# Direction to the closest coin determined by BFS
+coin_direction = get_coin_direction(object_position=game_state["field"], coin_list=game_state["coins"],
+                                    self_position=game_state["self"][3])
+coin_info = coin_bfs(game_state["field"], game_state["coins"], game_state["self"][3])
 
-
-bomb_map = get_bomb_map(game_state["field"], game_state["bombs"], game_state["explosion_map"])
-plt.imshow(bomb_map)
+# 2D array indicating which area is affected by exploded bombs or by bombs which are about to explode
+explosion_map = get_bomb_map(object_position=game_state["field"], bomb_list=game_state["bombs"],
+                             explosion_position=game_state["explosion_map"])
+plt.imshow(explosion_map)
 plt.show()
+save_info = save_bfs(game_state["field"], explosion_map, game_state["self"][3])
+
+# 1D array indicating in which direction to flee from bomb if immediate danger
+# if no immediate danger return 5 zeros or current spot is safe returns all zeros, otherwise direction
+safe_direction = get_safe_direction(object_position=game_state["field"], explosion_map=explosion_map,
+                                    self_position=game_state["self"][3])
+
+# 1D array indicating whether current field, up, right, down, left are dangerous
+danger = get_danger(explosion_map=explosion_map, self_position=game_state["self"][3])
+
+crate_direction = get_crate_direction(object_position=game_state["field"], explosion_map=explosion_map,
+                                      self_position=game_state["self"][3])
+crate_info = crate_bfs(game_state["field"], game_state["self"][3], explosion_map)
+
+# 1D array indicating whether bomb can be dropped and survival is possible
+bomb_info = get_bomb_info(object_position=game_state["field"], explosion_map=explosion_map,
+                          self=game_state["self"])
+
+features = np.concatenate([awareness,
+                           danger,
+                           safe_direction,
+                           coin_direction,
+                           crate_direction,
+                           bomb_info])
 
 
 

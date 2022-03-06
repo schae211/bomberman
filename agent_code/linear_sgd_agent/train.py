@@ -198,7 +198,6 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         gammas = [GAMMA ** t for t in range(0, len(rewards))]
 
         # now multiply elementwise discounted gammas by the rewards and get the sum
-
         n_steps_reward = (np.array(rewards) * np.array(gammas)).sum()
 
         # standard case: non-terminal state and model is fit

@@ -262,7 +262,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
 
 # this is where we are going to specify the rewards for certain actions
-def reward_from_events(self, events: List[str], old_game_state: dict, new_game_state) -> int:
+def reward_from_events(self, events: List[str], old_game_state: dict, new_game_state: dict) -> int:
     """
     Computing the rewards for our agent in a given step
     """

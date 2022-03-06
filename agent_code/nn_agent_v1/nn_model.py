@@ -7,7 +7,7 @@ from agent_code.nn_agent_v1.config import configs, SAVE_KEY, SAVE_TIME
 
 
 # Hyperparameters
-BATCH_SIZE = 32
+BATCH_SIZE = configs["BATCH_SIZE"]
 LOSS_FUNCTION = nn.MSELoss()
 LEARNING_RATE = 0.0001
 # play --no-gui --n-rounds 10000 --agents n_step_agent_v3 --train 1 --scenario crate_heaven
@@ -62,7 +62,7 @@ class NNModel(nn.Module):
                 loss, current = loss.item(), batch * len(X)
                 print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
-        torch.save(obj=self.model, f=f'{configs["MODEL_LOC"]}{SAVE_TIME}_{SAVE_KEY}_model.pt')
+        torch.save(obj=self.model, f=f'{configs["MODEL_LOC"]}/{SAVE_TIME}_{SAVE_KEY}_model.pt')
 
         return loss
 

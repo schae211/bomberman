@@ -18,7 +18,7 @@ SCENARIOS = {
     },
     # subtask 2
     "crate_heaven": {
-        "CRATE_DENSITY": 0.25,
+        "CRATE_DENSITY": 0.75,
         "COIN_COUNT": 40
     },
     # This is the tournament game mode

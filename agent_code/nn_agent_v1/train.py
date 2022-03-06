@@ -7,11 +7,12 @@ import pandas as pd
 import random
 from datetime import datetime
 
-
 import events as e
-from .callbacks import state_to_features
-from .callbacks import coin_bfs, save_bfs
-from .callbacks import get_bomb_map
+from agent_code.nn_agent_v1.callbacks import state_to_features
+from agent_code.nn_agent_v1.callbacks import coin_bfs, save_bfs
+from agent_code.nn_agent_v1.callbacks import get_bomb_map
+from agent_code.nn_agent_v1.config import configs
+from agent_code.nn_agent_v1.config import SAVE_KEY, SAVE_TIME
 
 
 # a way to structure our code?
@@ -25,7 +26,6 @@ ACTION_TRANSLATE_REV = {val: key for key, val in ACTION_TRANSLATE.items()}
 
 
 # Hyper parameters
-from .config import configs
 GAMMA = configs["GAMMA"]
 EPSILON = configs["EPSILON"]
 EPSILON_REDUCTION = configs["EPSILON_DECAY"]
@@ -44,9 +44,7 @@ GAME_SIZE = 17
 # specify argument whether training statistics should be saved
 SAVE_TRAIN = True
 SAVE_EVERY = 50
-SAVE_KEY = f'{configs["AGENT"]}_{configs["EPSILON"]}_{configs["EPSILON_DECAY"]}_{configs["EPSILON_MIN"]}_{configs["GAMMA"]}_{configs["N_STEPS"]}_{configs["MEMORY_SIZE"]}_{configs["BATCH_SIZE"]}_{configs["POLICY"]}_{configs["FEATURE_ENGINEERING"]}'
-SAVE_TIME = datetime.now().strftime("%d-%m-%Y-%H:%M")
-SAVE_DIR = "~/bomberman_stats/"
+SAVE_DIR = configs["MODEL_LOC"]
 if SAVE_TRAIN:
     step_information = {"round": [], "step": [], "events": [], "reward": []}
     episode_information = {"round": [], "TS_MSE_1": [], "TS_MSE_2": [], "TS_MSE_3": [],
@@ -231,6 +229,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         y.append(q_values)
 
         if AUGMENT:
+            pass
             augmented_states, augmented_values = augment_training(state, q_values)
             for s, qval in zip(augmented_states, augmented_values):
                 x.append(s)
@@ -244,7 +243,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     y_reshaped = np.stack(y, axis=0)
     self.logger.debug(f"Shape x_reshape: {x_reshaped.shape}")
     self.logger.debug(f"Shape y_reshape: {y_reshaped.shape}")
-    self.model.partial_fit(X=x_reshaped, y=y_reshaped)
+    self.model.fit(X=x_reshaped, y=y_reshaped)
     self.isFit = True
 
     global episode_information

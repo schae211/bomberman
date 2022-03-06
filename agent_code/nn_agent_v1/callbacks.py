@@ -1,10 +1,8 @@
 import os
 import pickle
 import numpy as np
-
-# import MultiOutputRegressor to create MultiOutputRegressor with LGBMRegressor
-from sklearn.linear_model import SGDRegressor
-from sklearn.multioutput import MultiOutputRegressor
+from agent_code.nn_agent_v1.nn_model import NNModel
+from agent_code.nn_agent_v1.config import configs
 
 # helper lists and dictionaries for actions
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
@@ -12,7 +10,6 @@ ACTION_TRANSLATE = {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3, "WAIT": 4, "BOMB"
 ACTION_TRANSLATE_REV = {val: key for key, val in ACTION_TRANSLATE.items()}
 
 # importing and defining parameters
-from .config import configs
 DEFAULT_PROBS = configs["DEFAULT_PROBS"]
 POLICY = configs["POLICY"]
 FEAT_ENG = configs["FEATURE_ENGINEERING"]
@@ -34,15 +31,12 @@ def setup(self):
     """
     if self.train or not os.path.isfile("my-saved-model.pt"):
         self.logger.info("Setting up model from scratch.")
-        # n_jobs=-1 means that all CPUs are used.
-        self.model = MultiOutputRegressor(SGDRegressor(loss="squared_error", penalty="l2"))
+        self.model = NNModel()
     else:
         self.logger.info("Loading model from saved state.")
-        # if a model has been trained before, load it again
-        with open("my-saved-model.pt", "rb") as file:
-            self.model = pickle.load(file)
+        self.model = NNModel()
 
-    # variable necessary to keep track if we have fitted our MultiOutputRegressor(LGBMRegressor(...))
+    # TODO: We do not need this variable for NNs
     self.isFit = False
 
 

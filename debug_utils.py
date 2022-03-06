@@ -29,35 +29,6 @@ feature_description = [
     "bomb_info_survival_possible"
 ]
 
-def translate_standard_features(features):
-    return {
-        "awareness_up": features[0],
-        "awareness_right": features[1],
-        "awareness_down": features[2],
-        "awareness_left": features[3],
-        "danger_current": features[4],
-        "danger_up": features[5],
-        "danger_right": features[6],
-        "danger_down": features[7],
-        "danger_left": features[8],
-        "safe_direction_none": features[9],
-        "safe_direction_up": features[10],
-        "safe_direction_right": features[11],
-        "safe_direction_down": features[12],
-        "safe_direction_left": features[13],
-        "coin_direction_up": features[14],
-        "coin_direction_right": features[15],
-        "coin_direction_down": features[16],
-        "coin_direction_left": features[17],
-        "crate_direction_current": features[18],
-        "crate_direction_up": features[19],
-        "crate_direction_right": features[20],
-        "crate_direction_down": features[21],
-        "crate_direction_left": features[22],
-        "bomb_info_bomb_possible": features[23],
-        "bomb_info_survival_possible": features[24]
-    }
-
 
 def print_field(game_state):
     # Red
@@ -89,4 +60,29 @@ def print_field(game_state):
     channels = channels.astype(np.float)
     plt.imshow(channels[:, :, :])
     plt.show()
+
+
+def print_channels(channels):
+    object_map, self_map, coin_map, explosion_map = channels[0], channels[1], channels[2], channels[3]
+
+    fig, axis = plt.subplots(2, 2)
+    fig.set_size_inches(12, 10)
+    axis = axis.flatten()
+    im1 = axis[0].imshow(object_map)
+    axis[0].set_title("Object Map")
+    plt.colorbar(im1, ax=axis[0])
+
+    im2 = axis[1].imshow(coin_map)
+    axis[1].set_title("Coin Map")
+    plt.colorbar(im2, ax=axis[1])
+
+    im3 = axis[2].imshow(explosion_map)
+    axis[2].set_title("Explosion Map")
+    plt.colorbar(im3, ax=axis[2])
+
+    im4 = axis[3].imshow(self_map)
+    axis[3].set_title("Self Map")
+    plt.colorbar(im4, ax=axis[3])
+    plt.show()
+
 

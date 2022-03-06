@@ -82,8 +82,8 @@ def act(self, game_state: dict) -> str:
         elif POLICY == "stochastic":
             # normalize the q_values, take care not to divide by zero (fall back to default probs)
             if any(q_values != 0):
-                probs = (q_values - q_values.min()) / (q_values.max() - q_values.min())  # min-max scaling
-                probs = probs / probs.sum()  # normalization
+                q_values /= 100
+                probs = np.exp(q_values) / np.sum(np.exp(q_values))
             else:
                 self.logger.debug("Choosing action at random because q-values are all 0")
                 probs = DEFAULT_PROBS
@@ -111,6 +111,9 @@ def state_to_features(game_state: dict) -> np.array:
         return None
 
     if FEAT_ENG == "channels":
+
+        object_map = game_state["field"]
+
         # for the coin challenge we need to know where the agent is, where walls are and where the coins are
         # so, we create a coin map in the same shape as the field
         coin_map = np.zeros_like(game_state["field"])
@@ -121,8 +124,11 @@ def state_to_features(game_state: dict) -> np.array:
         self_map = np.zeros_like(game_state["field"])
         self_map[game_state["self"][3]] = 1
 
+        explosion_map = get_bomb_map(object_position=game_state["field"], bomb_list=game_state["bombs"],
+                                     explosion_position=game_state["explosion_map"])
+
         # create channels based on the field and coin information.
-        channels = [self_map, game_state["field"], coin_map]
+        channels = [object_map, self_map, coin_map, explosion_map]
 
         # concatenate them as a feature tensor (they must have the same shape), ...
         stacked_channels = np.stack(channels)

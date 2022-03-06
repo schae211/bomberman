@@ -1,6 +1,6 @@
 
 configs = {
-    "AGENT": "linear_sgd",
+    "AGENT": "linear-sgd",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 0.2,
     # epsilon-greedy strategy decay parameter: epsilon(t) := epsilon(t-1) * decay^(#episode)
@@ -16,9 +16,9 @@ configs = {
     # how many transitions should be sampled from the memory to train the model
     "BATCH_SIZE": 400,
     # use "deterministic" or "stochastic" policy
-    "POLICY": "deterministic",
+    "POLICY": "stochastic",
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "minimal"}
-    "FEATURE_ENGINEERING": "standard"
+    "FEATURE_ENGINEERING": "channels"
 }

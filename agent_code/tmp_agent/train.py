@@ -7,12 +7,10 @@ import pandas as pd
 import random
 from datetime import datetime
 
-
 import events as e
 from .callbacks import state_to_features
-from .callbacks import coin_bfs, save_bfs
+from .callbacks import Node, possible_moves, get_neighbors, coin_bfs, save_bfs
 from .callbacks import get_bomb_map
-
 
 # a way to structure our code?
 Transition = namedtuple("Transition",
@@ -22,7 +20,6 @@ Transition = namedtuple("Transition",
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 ACTION_TRANSLATE = {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3, "WAIT": 4, "BOMB": 5}
 ACTION_TRANSLATE_REV = {val: key for key, val in ACTION_TRANSLATE.items()}
-
 
 # Hyper parameters
 from .config import configs
@@ -54,9 +51,6 @@ if SAVE_TRAIN:
 
 # global variable to store the last states
 LAST_STATES = 5
-
-#
-PRIORITIZED_REPLAY = True
 
 
 def setup_training(self):
@@ -221,10 +215,6 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
         # for the action that we actually took update the q-value according to above
         q_values[action] = q_update
-
-        if PRIORITIZED_REPLAY:
-            pass
-
 
         # append the predictors x=state, and response y=q_values
         x.append(state)

@@ -112,3 +112,4 @@ screenshots/*.webm
 replays/
 results/*.csv
 stats.json
+*.csv

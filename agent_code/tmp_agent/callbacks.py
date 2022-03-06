@@ -82,8 +82,8 @@ def act(self, game_state: dict) -> str:
         elif POLICY == "stochastic":
             # normalize the q_values, take care not to divide by zero (fall back to default probs)
             if any(q_values != 0):
-                q_values /= 100
-                probs = np.exp(q_values) / np.sum(np.exp(q_values))
+                probs = (q_values - q_values.min()) / (q_values.max() - q_values.min())  # min-max scaling
+                probs = probs / probs.sum()  # normalization
             else:
                 self.logger.debug("Choosing action at random because q-values are all 0")
                 probs = DEFAULT_PROBS
@@ -111,9 +111,6 @@ def state_to_features(game_state: dict) -> np.array:
         return None
 
     if FEAT_ENG == "channels":
-
-        object_map = game_state["field"]
-
         # for the coin challenge we need to know where the agent is, where walls are and where the coins are
         # so, we create a coin map in the same shape as the field
         coin_map = np.zeros_like(game_state["field"])
@@ -124,11 +121,8 @@ def state_to_features(game_state: dict) -> np.array:
         self_map = np.zeros_like(game_state["field"])
         self_map[game_state["self"][3]] = 1
 
-        explosion_map = get_bomb_map(object_position=game_state["field"], bomb_list=game_state["bombs"],
-                                     explosion_position=game_state["explosion_map"])
-
         # create channels based on the field and coin information.
-        channels = [object_map, self_map, coin_map, explosion_map]
+        channels = [self_map, game_state["field"], coin_map]
 
         # concatenate them as a feature tensor (they must have the same shape), ...
         stacked_channels = np.stack(channels)
@@ -173,20 +167,150 @@ def state_to_features(game_state: dict) -> np.array:
 
         return features
 
+    elif FEAT_ENG == "minimal":
+
+        # self position, basically needed for all features below
+        self_position = np.array(game_state["self"][3])
+
+        # Situational awareness, indicating in which directions the agent can move
+        awareness = np.array([
+            game_state["field"][self_position[0] - 1, self_position[1]],  # up
+            game_state["field"][self_position[0], self_position[1] + 1],  # right
+            game_state["field"][self_position[0] + 1, self_position[1]],  # down
+            game_state["field"][self_position[0], self_position[1] - 1]  # left
+        ])
+
+        coins = game_state["coins"]
+        # check if there are revealed coins
+        # there are 4 possibilities (up, right, down, left), so we need a vector of length 2
+        if len(coins) == 0:
+            coin_direction = np.zeros(2)
+        else:
+            # perform BFS to find the nearest coin
+            coin_info = coin_bfs(object_position=game_state["field"], coin_position=game_state["coins"],
+                                 self_position=game_state["self"][3])
+
+            coin_direction = np.zeros(2)
+            if coin_info:  # can we even reach the revealed coins?
+                if coin_info[0][0] == "up":
+                    coin_direction[0] += 1
+                elif coin_info[0][0] == "right":
+                    coin_direction[1] -= 1
+                elif coin_info[0][0] == "down":
+                    coin_direction[0] += 1
+                elif coin_info[0][0] == "left":
+                    coin_direction[1] -= 1
+
+        # get information about affected areas meaning where bombs are about to explode and where it is still dangerous
+        # TODO: Consider countdown information
+        explosion_map = game_state["explosion_map"].copy()
+        bombs = game_state["bombs"].copy()
+        for bomb_pos, bomb_ctd in bombs:
+            explosion_map[bomb_pos] += 1
+            # check above
+            for up_x in range(bomb_pos[0] - 1, bomb_pos[0] - 4, -1):
+                if 0 <= up_x <= 16:
+                    if game_state["field"][up_x, bomb_pos[1]] == -1:
+                        break
+                    else:
+                        explosion_map[up_x, bomb_pos[1]] += 1
+            # check below
+            for down_x in range(bomb_pos[0] + 1, bomb_pos[0] + 4, 1):
+                if 0 <= down_x <= 16:
+                    if game_state["field"][down_x, bomb_pos[1]] == -1:
+                        break
+                    else:
+                        explosion_map[down_x, bomb_pos[1]] += 1
+            # check to the left
+            for left_y in range(bomb_pos[1] - 1, bomb_pos[1] - 4, -1):
+                if 0 <= left_y <= 16:
+                    if game_state["field"][bomb_pos[0], left_y] == -1:
+                        break
+                    else:
+                        explosion_map[bomb_pos[0], left_y] += 1
+            # check to the right
+            for right_y in range(bomb_pos[1] + 1, bomb_pos[1] + 4, 1):
+                if 0 <= right_y <= 16:
+                    if game_state["field"][bomb_pos[0], right_y] == -1:
+                        break
+                    else:
+                        explosion_map[bomb_pos[0], right_y] += 1
+        # normalize explosion map (since two bombs are not more dangerous than one bomb)
+        explosion_map = np.where(explosion_map > 0, 1, 0)
+
+        # find the closest save spot using once again BFS, ones indicate save spots
+        # we basically remove all the positions that are not returned by BFS indicating they are not the closest escape
+        # again we need a vector of length 2,
+        explosion_direction = np.zeros(2)
+        if np.sum(explosion_map) > 0:
+            explosion_info = save_bfs(object_position=game_state["field"], explosion_map=explosion_map,
+                                      self_position=game_state["self"][3])
+            if explosion_info == "dead":  # no safe position at all detected
+                explosion_direction += 1
+            elif explosion_info == ([], []):  # current position is safe
+                pass
+            elif explosion_info[0][0] == "up":  # up is safe
+                explosion_direction[0] += 1
+            elif explosion_info[0][0] == "right":  # right is safe
+                explosion_direction[1] += 1
+            elif explosion_info[0][0] == "down":  # down is safe
+                explosion_direction[0] -= 1
+            elif explosion_info[0][0] == "left":  # left is safe
+                explosion_direction[1] -= 1
+
+        # add feature vector indicating whether the self position or the adjacent fields are dangerous
+        danger = np.array([explosion_map[self_position[0], self_position[1]],  # current position
+                           explosion_map[self_position[0] - 1, self_position[1]],  # up
+                           explosion_map[self_position[0], self_position[1] + 1],  # right
+                           explosion_map[self_position[0] + 1, self_position[1]],  # down
+                           explosion_map[self_position[0], self_position[1] - 1]])  # left
+
+        # add feature vector indicating in which direction to move to destroy the most tiles
+        # encoding:
+        # TODO: Should we only consider this if we can throw a bomb?
+        crate_direction = np.zeros(2)
+        crate_info = crate_bfs(game_state["field"], game_state["self"][3], explosion_map)
+        if crate_info:  # check whether at all it makes sense to destroy crates now
+            if crate_info == ([], []):  # current position
+                pass
+            elif crate_info[0][0] == "up":
+                crate_direction[0] += 1
+            elif crate_info[0][0] == "right":
+                crate_direction[1] += 1
+            elif crate_info[0][0] == "down":
+                crate_direction[0] -= 1
+            elif crate_info[0][0] == "left":
+                crate_direction[1] -= 1
+
+        surviving_bomb = np.array(check_survival(game_state["field"], explosion_map, game_state["self"][3])[0]).reshape(
+            -1)
+
+        if explosion_map.sum() > 0:
+            break_here = 0  # for debugging purposes, put condition above
+
+        features = np.concatenate([awareness,
+                                   coin_direction,
+                                   explosion_direction,
+                                   danger,
+                                   crate_direction,
+                                   surviving_bomb])
+
+        return features
+
 
 # define simple node class used for BFS
 class Node(object):
     def __init__(self, position, parent_position, move, steps=None):
-        self.position = position                    # child node position
-        self.parent_position = parent_position      # parent node position
-        self.move = move                            # how to get from parent to child node
-        self.steps = steps                          # number of steps from starting node (not always used)
+        self.position = position
+        self.parent_position = parent_position
+        self.move = move
+        self.steps = steps
 
 
 # define simple queue class that also allows checking for states (which is an attribute of the node)
 class Queue(object):
     def __init__(self):
-        self.fifo = []  # first in first out
+        self.fifo = []
 
     def put(self, node):
         self.fifo.append(node)
@@ -205,21 +329,32 @@ class Queue(object):
             return node
 
 
-def get_neighbors(object_position, position):
-    neighbor_info = {"actions": [], "neighbors": []}
+def possible_moves(object_position, position):
+    moves = []
     if object_position[position[0] - 1, position[1]] == 0:
-        neighbor_info["actions"].append("up")
-        neighbor_info["neighbors"].append((position[0] - 1, position[1]))
+        moves.append("up")
     if object_position[position[0], position[1] + 1] == 0:
-        neighbor_info["actions"].append("right")
-        neighbor_info["neighbors"].append((position[0], position[1] + 1))
+        moves.append("right")
     if object_position[position[0] + 1, position[1]] == 0:
-        neighbor_info["actions"].append("down")
-        neighbor_info["neighbors"].append((position[0] + 1, position[1]))
+        moves.append("down")
     if object_position[position[0], position[1] - 1] == 0:
-        neighbor_info["actions"].append("left")
-        neighbor_info["neighbors"].append((position[0], position[1] - 1))
-    return neighbor_info
+        moves.append("left")
+    return moves
+
+
+def get_neighbors(object_position, position):
+    neighbors = []
+    possible = possible_moves(object_position, position)
+    for move in possible:
+        if move == "up":
+            neighbors.append((position[0] - 1, position[1]))
+        elif move == "right":
+            neighbors.append((position[0], position[1] + 1))
+        elif move == "down":
+            neighbors.append((position[0] + 1, position[1]))
+        elif move == "left":
+            neighbors.append((position[0], position[1] - 1))
+    return {"actions": possible, "neighbors": neighbors}
 
 
 def coin_bfs(object_position, coin_position, self_position):

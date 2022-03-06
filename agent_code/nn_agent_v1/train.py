@@ -260,10 +260,6 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     if last_game_state["round"] % SAVE_EVERY == 0:
         pd.DataFrame(episode_information).to_csv(f"{SAVE_DIR}/{SAVE_TIME}_{SAVE_KEY}_episode_stats.csv", index=False)
 
-    # Store the current model
-    with open("my-saved-model.pt", "wb") as file:
-        pickle.dump(self.model, file)
-
 
 # this is where we are going to specify the rewards for certain actions
 def reward_from_events(self, events: List[str], old_game_state: dict, new_game_state) -> int:

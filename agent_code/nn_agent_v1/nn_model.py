@@ -23,6 +23,7 @@ class NNModel(nn.Module):
         super(NNModel, self).__init__()
         self.model = MLP(input_size=25, output_size=6, hidden_size=128)
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=LEARNING_RATE)
+        self.model.to(device)
         # self.model = torch.load()
         # self.model.eval()
         # print("LOAD MODEL")

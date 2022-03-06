@@ -7,7 +7,8 @@ import numpy as np
 
 # Hyperparameters
 BATCH_SIZE = 32
-LOSS_FUNCTION = nn.MSELoss()
+# LOSS_FUNCTION = nn.MSELoss()
+LOSS_FUNCTION = nn.HuberLoss()
 LEARNING_RATE = 0.0001
 # play --no-gui --n-rounds 10000 --agents n_step_agent_v3 --train 1 --scenario crate_heaven
 
@@ -21,7 +22,7 @@ class NNModel(nn.Module):
         super(NNModel, self).__init__()
         self.model = MLP(input_size=25, output_size=6, hidden_size=128)
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=LEARNING_RATE)
-        # self.model = torch.load("/Users/maxschafer/PycharmProjects/bomberman/agent_code/n_step_agent_v3/best_my-saved-model.pt")
+        # self.model = torch.load("/Users/maxschafer/PycharmProjects/bomberman/agent_code/n_step_agent_v3/my-saved-model.pt")
         # self.model.eval()
         print("LOAD MODEL")
 

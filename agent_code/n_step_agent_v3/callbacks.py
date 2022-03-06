@@ -34,7 +34,7 @@ ACTION_TRANSLATE_REV = {
 DEFAULT_PROBS = [.2, .2, .2, .2, .1, .1]
 
 # Define option for policy: {"stochastic", "deterministic"}
-POLICY = "stochastic"
+POLICY = "deterministic"
 
 # Define option for feature engineering: {"channels", "standard", "minimal"}
 FEAT_ENG = "standard"

@@ -347,17 +347,23 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
 
     game_rewards = {
         # e.COIN_COLLECTED: 100 * GAMMA ** step,  # discount the reward for collecting coins over time
-        e.COIN_COLLECTED: 60,
-        e.KILLED_SELF: -200,
-        e.INVALID_ACTION: -2,
-        e.WAITED: -1.5,
-        e.MOVE_TO_COIN: 5,
-        e.MOVE_FROM_COIN: -5,
-        e.MOVE_IN_CIRCLES: -2,
-        e.CRATE_DESTROYED: 40,
+        e.COIN_COLLECTED: 70,
+        e.KILLED_SELF: -150,
+        e.INVALID_ACTION: -20,
+        e.WAITED: -5,
+        # e.MOVE_TO_COIN: 10,
+        # e.MOVE_FROM_COIN: -10,
+        e.MOVE_IN_CIRCLES: -10,
+        e.CRATE_DESTROYED: 20,
         # e.SUICIDE_BOMB: -100,
-        e.ESCAPE_FROM_BOMB: 10,
-        e.STAY_IN_BOMB: -10
+        # e.ESCAPE_FROM_BOMB: 10,
+        # e.STAY_IN_BOMB: -10,
+        # e.MOVED_LEFT: -2,
+        # e.MOVED_RIGHT: -2,
+        # e.MOVED_UP: -2,
+        # e.MOVED_DOWN: -2,
+        e.COIN_FOUND: 15,
+        # e.BOMB_DROPPED: 20,
         # e.KILLED_OPPONENT: 5 # not useful at the moment
     }
     reward_sum = 0

@@ -76,7 +76,6 @@ def act(self, game_state: dict) -> str:
         elif POLICY == "stochastic":
             # normalize the q_values, take care not to divide by zero (fall back to default probs)
             if any(q_values != 0):
-                q_values /= 100
                 probs = np.exp(q_values) / np.sum(np.exp(q_values))
             else:
                 self.logger.debug("Choosing action at random because q-values are all 0")

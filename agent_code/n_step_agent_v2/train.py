@@ -11,6 +11,8 @@ from .callbacks import state_to_features
 from .callbacks import Node, possible_moves, get_neighbors, coin_bfs, save_bfs
 from .callbacks import get_bomb_map
 
+from .callbacks import MODEL_PATH
+
 # a way to structure our code?
 Transition = namedtuple("Transition",
                         ("round", "state", "action", "next_state", "reward"))
@@ -177,7 +179,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     step_information["reward"].append(reward_from_events(self, events, last_game_state, None))
 
     if last_game_state["round"] % SAVE_EVERY == 0:
-        pd.DataFrame(step_information).to_csv("game_stats.csv", index=False)
+        pd.DataFrame(step_information).to_csv(f"{MODEL_PATH}game_stats.csv", index=False)
 
     # Train the model
     self.logger.debug(f"Starting to train the model (has it been fit before={self.isFit})\n")
@@ -275,10 +277,10 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         episode_information["TS_MSE_6"].append(TS_MSE[5])
 
     if last_game_state["round"] % SAVE_EVERY == 0:
-        pd.DataFrame(episode_information).to_csv("episode_stats.csv", index=False)
+        pd.DataFrame(episode_information).to_csv(f"{MODEL_PATH}episode_stats.csv", index=False)
 
     # Store the current model
-    with open("my-saved-model.pt", "wb") as file:
+    with open(f"{MODEL_PATH}my-saved-model.pt", "wb") as file:
         pickle.dump(self.model, file)
 
 

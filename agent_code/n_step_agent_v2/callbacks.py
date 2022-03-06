@@ -7,7 +7,6 @@ from sklearn.multioutput import MultiOutputRegressor
 from lightgbm import LGBMRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
-from numba import jit
 
 # helper lists and dictionaries
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
@@ -27,6 +26,8 @@ ACTION_TRANSLATE_REV = {
     4: "WAIT",
     5: "BOMB"
 }
+
+MODEL_PATH = "/content/drive/MyDrive/Bomberman/bomberman/test/"
 
 # DEFAULT_PROBS = [.225, .225, .225, .225, .1, .0] # no bombs
 # DEFAULT_PROBS = [.15, .15, .15, .15, .1, .3] # many bombs
@@ -53,7 +54,7 @@ def setup(self):
 
     :param self: This object is passed to all callbacks and you can set arbitrary values.
     """
-    if self.train or not os.path.isfile("my-saved-model.pt"):
+    if self.train or not os.path.isfile(f"{MODEL_PATH}my-saved-model.pt"):
         self.logger.info("Setting up model from scratch.")
         # n_jobs=-1 means that all CPUs are used.
         self.model = MultiOutputRegressor(LGBMRegressor(n_estimators=100, n_jobs=-1))
@@ -62,7 +63,7 @@ def setup(self):
     else:
         self.logger.info("Loading model from saved state.")
         # if a model has been trained before, load it again
-        with open("my-saved-model.pt", "rb") as file:
+        with open(f"{MODEL_PATH}my-saved-model.pt", "rb") as file:
             self.model = pickle.load(file)
 
     # variable necessary to keep track if we have fitted our MultiOutputRegressor(LGBMRegressor(...))
@@ -305,6 +306,7 @@ def state_to_features(game_state: dict) -> np.array:
             elif crate_info[0][0] == "left":
                 crate_direction[1] -= 1
 
+        # QUESTION:
         surviving_bomb = np.array(check_survival(game_state["field"], explosion_map, game_state["self"][3])[0]).reshape(
             -1)
 
@@ -325,6 +327,7 @@ def state_to_features(game_state: dict) -> np.array:
 class Node(object):
     def __init__(self, position, parent_position, move):
         self.position = position
+        # QUESTION: What is the parent_position?
         self.parent_position = parent_position
         self.move = move
 
@@ -335,8 +338,10 @@ class Queue(object):
         self.fifo = []
 
     def put(self, node):
+        # append an object of class Node to the list fifo
         self.fifo.append(node)
 
+    # QUESTION: What does state mean here?
     def contains_state(self, state):
         return any(node.position == state for node in self.fifo)
 
@@ -350,7 +355,7 @@ class Queue(object):
             node = self.fifo.pop(0)
             return node
 
-
+# in which direction can we move?
 def possible_moves(object_position, position):
     moves = []
     if object_position[position[0] - 1, position[1]] == 0:
@@ -363,9 +368,10 @@ def possible_moves(object_position, position):
         moves.append("left")
     return moves
 
-
+# what are the free neighboring fields?
 def get_neighbors(object_position, position):
     neighbors = []
+    # in which directions can we move?
     possible = possible_moves(object_position, position)
     for move in possible:
         if move == "up":
@@ -376,6 +382,7 @@ def get_neighbors(object_position, position):
             neighbors.append((position[0] + 1, position[1]))
         elif move == "left":
             neighbors.append((position[0], position[1] - 1))
+    # returns in which directions we can move and what the free neighboring fields are
     return {"actions": possible, "neighbors": neighbors}
 
 
@@ -759,7 +766,7 @@ def get_crate_direction(object_position, explosion_map, self_position):
 
 def get_bomb_info(object_position, explosion_map, self):
     bomb_info = np.zeros(2)
-    # check if bomb action is possible
+    # check if bomb action is possible self[2] is a boolean
     if self[2]:
         bomb_info[0] = 1
     if check_survival(object_position, explosion_map, self[3]):

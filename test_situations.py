@@ -49,7 +49,7 @@ def build_arena(COLS, ROWS, CRATE_DENSITY, COIN_COUNT, SEED):
 
     return arena, collectable_coins
 
-scenario = "3"
+scenario = "suicide"
 
 if scenario == "1":
     arena = build_arena(17, 17, 0.2, 50, 42)
@@ -85,6 +85,18 @@ elif scenario == "3":
         "coins": arena[1],
         "self": ("my_agent", 0, True, (1, 2)),
         "bombs": [((1, 3), 4), ((2, 3), 4), ((4, 1), 0)],
+        "explosion_map": np.zeros_like(arena[0])
+    }
+
+elif scenario == "suicide":
+    arena = build_arena(17, 17, 0.7, 50, 42)
+    game_state = {
+        "round": 1,
+        "step": 1,
+        "field": arena[0],
+        "coins": arena[1],
+        "self": ("my_agent", 0, True, (1, 1)),
+        "bombs": [],
         "explosion_map": np.zeros_like(arena[0])
     }
 

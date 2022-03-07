@@ -160,14 +160,25 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     # Train the model
     self.logger.debug(f"Starting to train the model (has it been fit before={self.isFit})\n")
 
+    # Prioritized Replay
+    # Before building our training dataset, we need to compute the temporal difference error for transitions
+    # currently stored in the memory (aka replay buffer).
+
+
     # initialize our x and y which we use for fitting later on
     x = []
     y = []
 
-    # TODO: Prioritized Replay
+    # TODO: Check if implementation for Prioritized Replay is correct
     # get a batch -> using batches might be helpful to not get stuck in bad games...
     if len(self.memory) > BATCH_SIZE:
-        batch = random.sample(range(len(self.memory)), BATCH_SIZE)
+        # Prioritized Replay: Before building our training dataset, we need to compute the temporal difference error
+        # for transitions currently stored in the memory (aka replay buffer).
+        if self.isFit:
+            priorities = get_priority(self)
+            batch = np.random.choice(a=np.arange(0, len(self.memory)), size=BATCH_SIZE, replace=False, p=priorities)
+        else:
+            batch = np.random.choice(a=np.arange(0, len(self.memory)), size=BATCH_SIZE, replace=False)
     else:
         batch = range(len(self.memory))
 
@@ -219,10 +230,6 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
         # for the action that we actually took update the q-value according to above
         q_values[action] = q_update
-
-        if PRIORITIZED_REPLAY:
-            pass
-
 
         # append the predictors x=state, and response y=q_values
         x.append(state)
@@ -410,3 +417,62 @@ def rotated_actions(rot, q_values):
         return np.array([q_values[2], q_values[3], q_values[0], q_values[1], q_values[4], q_values[5]])
     elif rot == 3:
         return np.array([q_values[1], q_values[2], q_values[3], q_values[0], q_values[4], q_values[5]])
+
+
+def get_priority(self):
+    """
+    Only called when the model is fitted
+    Compute priority values for prioritized replay
+    :param self:
+    :return:
+    """
+    memory = self.memory
+    temporal_differences = np.zeros(len(memory))
+    for i in range(len(memory)):
+        # get episode and state
+        episode, state = memory[i].round, memory[i].state
+
+        # translate action to int
+        action = ACTION_TRANSLATE[memory[i].action]
+
+        # starting states have no priority
+        if memory[i].state is None:
+            temporal_differences[i] = 0
+
+        # get the reward of the N next steps, check that loop does not extend over length of memory
+        rewards = []
+        loop_until = min(i + N, len(memory))  # prevent index out of range error
+        for t in range(i, loop_until):
+            # check whether we are still in the same episode
+            if memory[t].round == episode:
+                rewards.append(memory[t].reward)
+
+        gammas = [GAMMA ** t for t in range(0, len(rewards))]
+
+        # now multiply elementwise discounted gammas by the rewards and get the sum
+        n_steps_reward = (np.array(rewards) * np.array(gammas)).sum()
+
+        # standard case: non-terminal state and model is fit
+        if self.memory[len(rewards) - 1].next_state is not None:
+            q_update = n_steps_reward + GAMMA ** N * \
+                       np.amax(self.model.predict(self.memory[len(rewards) - 1].next_state.reshape(1, -1)))
+            q_values = self.model.predict(state.reshape(1, -1)).reshape(-1)
+
+        # if we have a terminal state in the next states we cannot predict q-values for the terminal state
+        else:
+            q_update = n_steps_reward
+            q_values = self.model.predict(state.reshape(1, -1)).reshape(-1)
+
+        temporal_differences[i] = np.abs(q_update - q_values[action])
+
+        # adding constant to ensure that no experience has 0 probability to be taken
+        const_e = 1  # TODO: How to choose e here?
+        temporal_differences += const_e
+
+        # computing the priority values
+        const_a = 0.8 # TODO: How to choose e here?
+        priorities = (temporal_differences**const_a)/(temporal_differences**const_a).sum()
+        return priorities
+
+
+

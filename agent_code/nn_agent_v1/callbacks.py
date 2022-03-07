@@ -571,6 +571,16 @@ def get_crate_direction(object_position, bomb_list, self_position, explosion_map
 
 
 def get_bomb_info(object_position, explosion_map, bomb_list, self):
+    """
+    Compute vector of lenght 2 where the positions indicate:
+    0: 1 if bomb action possible else 0
+    1: 1 if bomb action does NOT lead to suicide else 0
+    :param object_position:
+    :param explosion_map:
+    :param bomb_list:
+    :param self:
+    :return:
+    """
     bomb_info = np.zeros(2)
     # check if bomb action is possible
     if self[2]:

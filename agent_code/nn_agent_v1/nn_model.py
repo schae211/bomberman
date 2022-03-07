@@ -8,7 +8,10 @@ from agent_code.nn_agent_v1.config import configs, SAVE_KEY, SAVE_TIME
 
 # Hyperparameters
 BATCH_SIZE = configs["BATCH_SIZE"]
-LOSS_FUNCTION = nn.MSELoss()
+if configs["LOSS"] == "huber":
+    LOSS_FUNCTION = nn.HuberLoss()
+elif configs["LOSS"] == "mse":
+    LOSS_FUNCTION = nn.MSELoss()
 LEARNING_RATE = 0.0001
 LOAD = False
 # play --no-gui --n-rounds 10000 --agents n_step_agent_v3 --train 1 --scenario crate_heaven

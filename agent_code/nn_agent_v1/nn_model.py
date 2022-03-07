@@ -10,6 +10,7 @@ from agent_code.nn_agent_v1.config import configs, SAVE_KEY, SAVE_TIME
 BATCH_SIZE = configs["BATCH_SIZE"]
 LOSS_FUNCTION = nn.MSELoss()
 LEARNING_RATE = 0.0001
+LOAD = False
 # play --no-gui --n-rounds 10000 --agents n_step_agent_v3 --train 1 --scenario crate_heaven
 
 
@@ -21,12 +22,15 @@ print(f"Using {device} device")
 class NNModel(nn.Module):
     def __init__(self):
         super(NNModel, self).__init__()
-        self.model = MLP(input_size=25, output_size=6, hidden_size=128)
-        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=LEARNING_RATE)
+        if LOAD:
+            print("LOAD MODEL")
+            self.model = torch.load("/Users/philipp/Python_projects/bomberman_rl/agent_code/nn_agent_v1/model.pt",
+                                    map_location=torch.device('cpu'))
+        else:
+            print("INITIALIZE MODEL")
+            self.model = MLP(input_size=25, output_size=6, hidden_size=128)
+            self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=LEARNING_RATE)
         self.model.to(device)
-        # self.model = torch.load()
-        # self.model.eval()
-        # print("LOAD MODEL")
 
     def predict(self, state: np.ndarray) -> np.ndarray:
         self.model.eval()

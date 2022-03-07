@@ -150,12 +150,12 @@ def state_to_features(game_state: dict) -> np.array:
         safe_direction = get_safe_direction(object_position=game_state["field"], explosion_map=explosion_map,
                                             self_position=game_state["self"][3])
 
-        crate_direction = get_crate_direction(object_position=game_state["field"], explosion_map=explosion_map,
-                                              self_position=game_state["self"][3])
+        crate_direction = get_crate_direction(object_position=game_state["field"], bomb_list=game_state["bombs"],
+                                              self_position=game_state["self"][3], explosion_map=explosion_map)
 
         # 1D array indicating whether bomb can be dropped and survival is possible
         bomb_info = get_bomb_info(object_position=game_state["field"], explosion_map=explosion_map,
-                                  self=game_state["self"])
+                                  self=game_state["self"], bomb_list=game_state["bombs"])
 
         features = np.concatenate([awareness,
                                    danger,
@@ -301,7 +301,8 @@ def save_bfs(object_position, explosion_map, self_position):
         # Add neighbors to frontier
         neighbors = get_neighbors(object_position, node.position)
         for action, neighbor in zip(neighbors["actions"], neighbors["neighbors"]):
-            if neighbor not in explored and not q.contains_state(neighbor):
+            # make sure that we do not die on the way to the potential neighbor
+            if neighbor not in explored and not q.contains_state(neighbor) and not 5/6 <= (explosion_map[neighbor] + ((node.steps+1) * 1/6)) <= 1:
                 # TODO: Check whether steps is really always + 1, but should make sense in BFS
                 child = Node(position=neighbor, parent_position=node, move=action, steps=node.steps+1)
                 q.put(child)
@@ -309,7 +310,7 @@ def save_bfs(object_position, explosion_map, self_position):
 
 # reduce default dist to make computations faster
 # TODO: Improve performance here
-def crate_bfs(object_position, self_position, explosion_map, max_dist=10):
+def crate_bfs(object_position, self_position, bomb_list, explosion_map, max_dist=10):
     """
     Find path to position where bomb destroys most crates via breadth-first search (BFS)
     Thereby, we have to take the distance to the considered positions into consideration (trade-off!)
@@ -357,7 +358,8 @@ def crate_bfs(object_position, self_position, explosion_map, max_dist=10):
         dist_to_self = np.abs(np.array(node.position) - np.array(self_position)).sum()
 
         # only consider if escaping is possible at the current position
-        if check_survival(object_position, explosion_map, node.position):
+        if check_survival(object_position=object_position, bomb_list=bomb_list,
+                          position=node.position, explosion_map=explosion_map):
 
             # compute number of destroyed crates
             destroyed_crates = get_destroyed_crates(object_position, node.position)
@@ -428,41 +430,13 @@ def get_destroyed_crates(object_position, bomb_position):
     return destroyed_crates
 
 
-def check_survival(object_position, explosion_map, position):
+def check_survival(object_position, bomb_list, position, explosion_map):
+    bomb_list_tmp = bomb_list.copy()
+    bomb_list_tmp.append(((position), 4))
     # add information about whether dropping a bomb is suicide
-    updated_explosion_map = explosion_map.copy()
-    updated_explosion_map[position] += 1
-    # check above
-    for up_x in range(position[0] - 1, position[0] - 4, -1):
-        if 0 <= up_x <= 16:
-            if object_position[up_x, position[1]] == -1:
-                break
-            else:
-                updated_explosion_map[up_x, position[1]] += 1
-    # check below
-    for down_x in range(position[0] + 1, position[0] + 4, 1):
-        if 0 <= down_x <= 16:
-            if object_position[down_x, position[1]] == -1:
-                break
-            else:
-                updated_explosion_map[down_x, position[1]] += 1
-    # check to the left
-    for left_y in range(position[1] - 1, position[1] - 4, -1):
-        if 0 <= left_y <= 16:
-            if object_position[position[0], left_y] == -1:
-                break
-            else:
-                updated_explosion_map[position[0], left_y] += 1
-    # check to the right
-    for right_y in range(position[1] + 1, position[1] + 4, 1):
-        if 0 <= right_y <= 16:
-            if object_position[position[0], right_y] == -1:
-                break
-            else:
-                updated_explosion_map[position[0], right_y] += 1
-
-    # normalize explosion map (since two bombs are not more dangerous than one bomb)
-    updated_explosion_map = np.where(updated_explosion_map > 0, 1, 0)
+    updated_explosion_map = get_bomb_map(object_position=object_position,
+                                         bomb_list=bomb_list_tmp,
+                                         explosion_position=explosion_map)
     check = save_bfs(object_position=object_position, explosion_map=updated_explosion_map,
                      self_position=position)
     if check != "dead":
@@ -504,46 +478,44 @@ def get_coin_direction(object_position, coin_list, self_position):
 
 def get_bomb_map(object_position, bomb_list, explosion_position):
     # get information about affected areas meaning where bombs are about to explode and where it is still dangerous
-    # TODO: Consider adding countdown information
     explosion_map = explosion_position.copy().astype(float)
-    ctd_to_score = lambda ctd : 5/6 - (1/6 * ctd)
-    if len(bomb_list) > 0:
-        break_here = 0
-    bombs = bomb_list.copy()
-    for bomb_pos, bomb_ctd in bombs:
-        # position of the bomb itself
-        explosion_map[bomb_pos] = max(explosion_map[bomb_pos], ctd_to_score(bomb_ctd))
-        # check above
-        for up_x in range(bomb_pos[0] - 1, bomb_pos[0] - 4, -1):
-            if 0 <= up_x <= 16:
-                if object_position[up_x, bomb_pos[1]] == -1:
-                    break
-                else:
-                    explosion_map[up_x, bomb_pos[1]] = max(explosion_map[up_x, bomb_pos[1]], ctd_to_score(bomb_ctd))
-        # check below
-        for down_x in range(bomb_pos[0] + 1, bomb_pos[0] + 4, 1):
-            if 0 <= down_x <= 16:
-                if object_position[down_x, bomb_pos[1]] == -1:
-                    break
-                else:
-                    explosion_map[down_x, bomb_pos[1]] = max(explosion_map[down_x, bomb_pos[1]], ctd_to_score(bomb_ctd))
-        # check to the left
-        for left_y in range(bomb_pos[1] - 1, bomb_pos[1] - 4, -1):
-            if 0 <= left_y <= 16:
-                if object_position[bomb_pos[0], left_y] == -1:
-                    break
-                else:
-                    explosion_map[bomb_pos[0], left_y] = max(explosion_map[bomb_pos[0], left_y], ctd_to_score(bomb_ctd))
-        # check to the right
-        for right_y in range(bomb_pos[1] + 1, bomb_pos[1] + 4, 1):
-            if 0 <= right_y <= 16:
-                if object_position[bomb_pos[0], right_y] == -1:
-                    break
-                else:
-                    explosion_map[bomb_pos[0], right_y] = max(explosion_map[bomb_pos[0], right_y], ctd_to_score(bomb_ctd))
-
-    # normalize explosion map (since two bombs are not more dangerous than one bomb)
-    return explosion_map
+    ctd_to_score = lambda ctd: 5/6 - (1/6 * ctd)
+    if bomb_list is None:
+        return explosion_map
+    else:
+        bombs = bomb_list.copy()
+        for bomb_pos, bomb_ctd in bombs:
+            # position of the bomb itself
+            explosion_map[bomb_pos] = max(explosion_map[bomb_pos], ctd_to_score(bomb_ctd))
+            # check above
+            for up_x in range(bomb_pos[0] - 1, bomb_pos[0] - 4, -1):
+                if 0 <= up_x <= 16:
+                    if object_position[up_x, bomb_pos[1]] == -1:
+                        break
+                    else:
+                        explosion_map[up_x, bomb_pos[1]] = max(explosion_map[up_x, bomb_pos[1]], ctd_to_score(bomb_ctd))
+            # check below
+            for down_x in range(bomb_pos[0] + 1, bomb_pos[0] + 4, 1):
+                if 0 <= down_x <= 16:
+                    if object_position[down_x, bomb_pos[1]] == -1:
+                        break
+                    else:
+                        explosion_map[down_x, bomb_pos[1]] = max(explosion_map[down_x, bomb_pos[1]], ctd_to_score(bomb_ctd))
+            # check to the left
+            for left_y in range(bomb_pos[1] - 1, bomb_pos[1] - 4, -1):
+                if 0 <= left_y <= 16:
+                    if object_position[bomb_pos[0], left_y] == -1:
+                        break
+                    else:
+                        explosion_map[bomb_pos[0], left_y] = max(explosion_map[bomb_pos[0], left_y], ctd_to_score(bomb_ctd))
+            # check to the right
+            for right_y in range(bomb_pos[1] + 1, bomb_pos[1] + 4, 1):
+                if 0 <= right_y <= 16:
+                    if object_position[bomb_pos[0], right_y] == -1:
+                        break
+                    else:
+                        explosion_map[bomb_pos[0], right_y] = max(explosion_map[bomb_pos[0], right_y], ctd_to_score(bomb_ctd))
+        return explosion_map
 
 
 def get_danger(explosion_map, self_position):
@@ -577,9 +549,10 @@ def get_safe_direction(object_position, explosion_map, self_position):
     return safe_direction
 
 
-def get_crate_direction(object_position, explosion_map, self_position):
+def get_crate_direction(object_position, bomb_list, self_position, explosion_map):
     crate_direction = np.zeros(5)
-    crate_info = crate_bfs(object_position, self_position, explosion_map)
+    crate_info = crate_bfs(object_position=object_position, self_position=self_position,
+                           bomb_list=bomb_list, explosion_map=explosion_map)
 
     if crate_info is not None:  # None is returned if destruction score was negative for all considered positions
         crate_direction[0] = 1              # indicating that target was found
@@ -597,12 +570,13 @@ def get_crate_direction(object_position, explosion_map, self_position):
     return crate_direction
 
 
-def get_bomb_info(object_position, explosion_map, self):
+def get_bomb_info(object_position, explosion_map, bomb_list, self):
     bomb_info = np.zeros(2)
     # check if bomb action is possible
     if self[2]:
         bomb_info[0] = 1
-    if check_survival(object_position, explosion_map, self[3]):
+    if check_survival(object_position=object_position, explosion_map=explosion_map,
+                      bomb_list=bomb_list, position=self[3]):
         bomb_info[1] = 1
     return bomb_info
 

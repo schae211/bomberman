@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from items import Coin
 from debug_utils import *
-from agent_code.n_step_agent_v2.callbacks import *
+from agent_code.nn_agent_v1.callbacks import *
 
 
 def build_arena(COLS, ROWS, CRATE_DENSITY, COIN_COUNT, SEED):
@@ -84,11 +84,9 @@ elif scenario == "3":
         "field": arena[0],
         "coins": arena[1],
         "self": ("my_agent", 0, True, (1, 2)),
-        "bombs": [((1, 3), 4), ((2, 3), 4), ((4, 1), -1)],
+        "bombs": [((1, 3), 4), ((2, 3), 4), ((4, 1), 0)],
         "explosion_map": np.zeros_like(arena[0])
     }
-
-print_field(game_state=game_state)
 
 # Situational awareness, indicating in which directions the agent can move
 # Add is bomb action possible?
@@ -102,8 +100,6 @@ coin_info = coin_bfs(game_state["field"], game_state["coins"], game_state["self"
 # 2D array indicating which area is affected by exploded bombs or by bombs which are about to explode
 explosion_map = get_bomb_map(object_position=game_state["field"], bomb_list=game_state["bombs"],
                              explosion_position=game_state["explosion_map"])
-plt.imshow(explosion_map)
-plt.show()
 save_info = save_bfs(game_state["field"], explosion_map, game_state["self"][3])
 
 # 1D array indicating in which direction to flee from bomb if immediate danger
@@ -115,12 +111,13 @@ safe_direction = get_safe_direction(object_position=game_state["field"], explosi
 danger = get_danger(explosion_map=explosion_map, self_position=game_state["self"][3])
 
 crate_direction = get_crate_direction(object_position=game_state["field"], explosion_map=explosion_map,
-                                      self_position=game_state["self"][3])
-crate_info = crate_bfs(game_state["field"], game_state["self"][3], explosion_map)
+                                      self_position=game_state["self"][3], bomb_list=game_state["bombs"])
+crate_info = crate_bfs(object_position=game_state["field"], self_position=game_state["self"][3],
+                       explosion_map=explosion_map, bomb_list=game_state["bombs"])
 
 # 1D array indicating whether bomb can be dropped and survival is possible
 bomb_info = get_bomb_info(object_position=game_state["field"], explosion_map=explosion_map,
-                          self=game_state["self"])
+                          self=game_state["self"], bomb_list=game_state["bombs"])
 
 features = np.concatenate([awareness,
                            danger,
@@ -129,7 +126,31 @@ features = np.concatenate([awareness,
                            crate_direction,
                            bomb_info])
 
+# channels
+object_map = game_state["field"]
 
+# for the coin challenge we need to know where the agent is, where walls are and where the coins are
+# so, we create a coin map in the same shape as the field
+coin_map = np.zeros_like(game_state["field"])
+for cx, cy in game_state["coins"]:
+    coin_map[cx, cy] = 1
+
+# also adding where one self is on the map
+self_map = np.zeros_like(game_state["field"])
+self_map[game_state["self"][3]] = 1
+
+explosion_map = get_bomb_map(object_position=game_state["field"], bomb_list=game_state["bombs"],
+                             explosion_position=game_state["explosion_map"])
+
+# create channels based on the field and coin information.
+channels = [object_map, self_map, coin_map, explosion_map]
+
+# concatenate them as a feature tensor (they must have the same shape), ...
+stacked_channels = np.stack(channels)
+# and return them as a vector
+stacked_channels = stacked_channels.reshape(-1)
+
+print_channels(channels)
 
 
 

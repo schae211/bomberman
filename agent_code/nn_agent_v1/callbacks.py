@@ -1,7 +1,8 @@
 import os
 import pickle
 import numpy as np
-from agent_code.nn_agent_v1.nn_model import NNModel
+# from agent_code.nn_agent_v1.nn_model import NNModel
+from agent_code.nn_agent_v1.dnn_model import DoubleNNModel
 from agent_code.nn_agent_v1.config import configs
 
 # helper lists and dictionaries for actions
@@ -31,13 +32,12 @@ def setup(self):
     """
     if self.train or not os.path.isfile("my-saved-model.pt"):
         self.logger.info("Setting up model from scratch.")
-        self.model = NNModel()
+        #self.model = NNModel()
+        self.model = DoubleNNModel()
     else:
         self.logger.info("Loading model from saved state.")
-        self.model = NNModel()
-
-    # TODO: We do not need this variable for NNs
-    self.isFit = False
+        #self.model = NNModel()
+        self.model = DoubleNNModel()
 
 
 def act(self, game_state: dict) -> str:
@@ -56,11 +56,6 @@ def act(self, game_state: dict) -> str:
     if self.train and np.random.rand() <= max(self.epsilon_min, self.epsilon * self.epsilon_reduction ** episode_n):
         self.logger.debug("Choosing action at random due to epsilon-greedy policy")
         return np.random.choice(ACTIONS, p=DEFAULT_PROBS)
-
-    elif self.train and not self.isFit:
-        self.logger.debug("Choosing action at random because model is not fitted yet")
-        return np.random.choice(ACTIONS, p=DEFAULT_PROBS)
-
     else:
         self.logger.debug("Querying fitted model for action.")
 

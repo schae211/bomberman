@@ -51,7 +51,7 @@ if SAVE_TRAIN:
     episode_information = {"round": [], "TS_MSE_1": [], "TS_MSE_2": [], "TS_MSE_3": [],
                            "TS_MSE_4": [], "TS_MSE_5": [], "TS_MSE_6": []}
 
-# global variable to store the last states
+# global variable to store the last states used to shape rewards
 LAST_STATES = 5
 
 #
@@ -158,28 +158,15 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     if last_game_state["round"] % SAVE_EVERY == 0:
         pd.DataFrame(step_information).to_csv(f"{SAVE_DIR}/{SAVE_TIME}_{SAVE_KEY}_game_stats.csv", index=False)
 
-    # Train the model
-    self.logger.debug(f"Starting to train the model (has it been fit before={self.isFit})\n")
-
-    # Prioritized Replay
-    # Before building our training dataset, we need to compute the temporal difference error for transitions
-    # currently stored in the memory (aka replay buffer).
-
-
     # initialize our x and y which we use for fitting later on
-    x = []
-    y = []
+    x, y = [], []
 
     # TODO: Check if implementation for Prioritized Replay is correct
-    # get a batch -> using batches might be helpful to not get stuck in bad games...
     if len(self.memory) > BATCH_SIZE:
         # Prioritized Replay: Before building our training dataset, we need to compute the temporal difference error
         # for transitions currently stored in the memory (aka replay buffer).
-        if self.isFit:
-            priorities = get_priority(self)
-            batch = np.random.choice(a=np.arange(0, len(self.memory)), size=BATCH_SIZE, replace=False, p=priorities)
-        else:
-            batch = np.random.choice(a=np.arange(0, len(self.memory)), size=BATCH_SIZE, replace=False)
+        priorities = get_priority(self)
+        batch = np.random.choice(a=np.arange(0, len(self.memory)), size=BATCH_SIZE, replace=False, p=priorities)
     else:
         batch = range(len(self.memory))
 
@@ -212,22 +199,18 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         n_steps_reward = (np.array(rewards) * np.array(gammas)).sum()
 
         # standard case: non-terminal state and model is fit
-        if self.memory[len(rewards) - 1].next_state is not None and self.isFit:
+        if self.memory[len(rewards) - 1].next_state is not None:
             q_update = n_steps_reward + GAMMA ** N * \
                        np.amax(self.model.predict(self.memory[len(rewards) - 1].next_state.reshape(1, -1)))
             # use the model to predict all the other q_values
             # (below we replace the q_value for the selected action with this q_update)
             q_values = self.model.predict(state.reshape(1, -1)).reshape(-1)
         # if we have a terminal state in the next states we cannot predict q-values for the terminal state
-        elif self.memory[len(rewards) - 1].next_state is None and self.isFit:
+        else:
             q_update = n_steps_reward
             # use the model to predict all the other q_values
             # (below we replace the q_value for the selected action with this q_update)
             q_values = self.model.predict(state.reshape(1, -1)).reshape(-1)
-        # if we haven't fit the model before the q-update is only the reward, and we set all other q_values to 0
-        elif self.isFit is False:
-            q_update = n_steps_reward
-            q_values = np.zeros(len(ACTIONS))
 
         # for the action that we actually took update the q-value according to above
         q_values[action] = q_update
@@ -235,13 +218,6 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         # append the predictors x=state, and response y=q_values
         x.append(state)
         y.append(q_values)
-
-        if AUGMENT:
-            pass
-            augmented_states, augmented_values = augment_training(state, q_values)
-            for s, qval in zip(augmented_states, augmented_values):
-                x.append(s)
-                y.append(qval)
 
     # importantly partial fitting is not possible with most methods except for NN (so we fit again to the whole TS)
     self.logger.debug(f"Fitting the model using the input as specified below:")
@@ -252,7 +228,6 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     self.logger.debug(f"Shape x_reshape: {x_reshaped.shape}")
     self.logger.debug(f"Shape y_reshape: {y_reshaped.shape}")
     self.model.fit(X=x_reshaped, y=y_reshaped)
-    self.isFit = True
 
     global episode_information
     if last_game_state:
@@ -334,46 +309,6 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
     return reward_sum
 
 
-# TODO: Augment training data by exploiting symmetry (so we have to play less)
-def augment_training(state, q_values):
-    """
-    Exploiting the rotational and mirror symmetry we can augment training data,
-    We just need to make sure to adjust all the movement directions accordingly
-    So we have 4 rotations: 90, 180, 270, 360 and each can be mirrored => TSx8!
-    :return:
-    """
-    augmented_states = []
-    augmented_values = []
-    reshape_feature = state.reshape(-1, GAME_SIZE, GAME_SIZE)
-    # looping through the rotation angles:
-    for i in range(4):
-        augmented_states.append(np.rot90(reshape_feature, i, axes=(1, 2)).reshape(-1))
-        augmented_values.append(rotated_actions(i, q_values))
-    return augmented_states, augmented_values
-
-
-def rotated_actions(rot, q_values):
-    """
-    mapping from default action sequence:   ["UP", "RIGHT", "DOWN", "LEFT", "WAIT", "BOMB"]
-                                               0      1       2        3       4       5
-    to 90° rotation:                        ["LEFT", "UP", "RIGHT", "DOWN", "WAIT", "BOMB"]
-    to 180° rotation:                       ["DOWN", "LEFT", "UP", "RIGHT", "WAIT", "BOMB"]
-    to 270° rotation:                        ["RIGHT", "DOWN", "LEFT", "UP", "WAIT", "BOMB"]
-    keep waiting and bomb the same
-    :param rot: integer {0,1,2,3}
-    :param q_values: np.array with shape = (#actions,)
-    :return: q_values: np.array with shape = (#actions,) adjusted according to the rotation
-    """
-    if rot == 0:
-        return q_values
-    elif rot == 1:
-        return np.array([q_values[3], q_values[0], q_values[1], q_values[2], q_values[4], q_values[5]])
-    elif rot == 2:
-        return np.array([q_values[2], q_values[3], q_values[0], q_values[1], q_values[4], q_values[5]])
-    elif rot == 3:
-        return np.array([q_values[1], q_values[2], q_values[3], q_values[0], q_values[4], q_values[5]])
-
-
 def get_priority(self):
     """
     Only called when the model is fitted
@@ -425,7 +360,7 @@ def get_priority(self):
         temporal_differences += const_e
 
         # computing the priority values
-        const_a = 0.8 # TODO: How to choose e here?
+        const_a = 0.8  # TODO: How to choose e here?
         priorities = (temporal_differences**const_a)/(temporal_differences**const_a).sum()
         return priorities
 

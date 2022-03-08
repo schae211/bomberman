@@ -113,3 +113,5 @@ replays/
 results/*.csv
 stats.json
 *.csv
+.DS_Store
+videos

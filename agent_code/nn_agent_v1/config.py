@@ -1,11 +1,12 @@
 
 from datetime import datetime
+from easydict import EasyDict as edict
 import os
 
-configs = {
-    "AGENT": "nn-v1",
+configs = edict({
+    "AGENT": "dnn-v1",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
-    "EPSILON": 0.2,
+    "EPSILON": 0.4,
     # epsilon-greedy strategy decay parameter: epsilon(t) := epsilon(t-1) * decay^(#episode)
     "EPSILON_DECAY": 0.999,
     # epsilon-greedy strategy minimum epsilon: epsilon(t) := max(0.05, epsilon(t-1) * decay^(#episode))
@@ -26,10 +27,14 @@ configs = {
     "FEATURE_ENGINEERING": "standard",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
+    # learning rate used for gradient descent in nn
+    "LEARNING_RATE": 0.0001,
+    # should we use prioritized experience replay or sample the batches randomly
+    "PRIORITIZED_REPLAY": True,
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats")
-}
+})
 
-SAVE_KEY = f'{configs["AGENT"]}_{configs["EPSILON"]}_{configs["EPSILON_DECAY"]}_{configs["EPSILON_MIN"]}_{configs["GAMMA"]}_{configs["N_STEPS"]}_{configs["MEMORY_SIZE"]}_{configs["BATCH_SIZE"]}_{configs["POLICY"]}_{configs["FEATURE_ENGINEERING"]}_{configs["LOSS"]}'
+SAVE_KEY = f'{configs["AGENT"]}_{configs["EPSILON"]}_{configs["EPSILON_DECAY"]}_{configs["EPSILON_MIN"]}_{configs["GAMMA"]}_{configs["N_STEPS"]}_{configs["MEMORY_SIZE"]}_{configs["BATCH_SIZE"]}_{configs["POLICY"]}_{configs["FEATURE_ENGINEERING"]}_{configs["LOSS"]}_{configs["LEARNING_RATE"]}_{configs["PRIORITIZED_REPLAY"]}'
 SAVE_TIME = datetime.now().strftime("%d-%m-%Y-%H-%M")
 

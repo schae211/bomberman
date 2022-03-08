@@ -50,33 +50,22 @@ def act(self, game_state: dict) -> str:
     :return: The action to take as a string.
     """
 
-    # only do exploration if we train, no random moves in tournament
-    # reduce exploration in later episodes/games
+    # only do exploration if we train, no random moves in tournament + reduce exploration in later episodes/games
     episode_n = 0 if game_state is None else game_state["round"]
     if self.train and np.random.rand() <= max(self.epsilon_min, self.epsilon * self.epsilon_reduction ** episode_n):
         self.logger.debug("Choosing action at random due to epsilon-greedy policy")
         return np.random.choice(ACTIONS, p=DEFAULT_PROBS)
     else:
         self.logger.debug("Querying fitted model for action.")
-
-        # array.reshape(1, -1) if it contains a single sample for MultiOutputRegressor
-        features = state_to_features(game_state).reshape(1, -1)
-
-        # compute q-values using our fitted model, important to flatten the output again
-        q_values = self.model.predict(features).reshape(-1)
+        features = state_to_features(game_state).reshape(1, -1)  # .reshape(1, -1) needed if single sample for MultiOutputRegressor
+        q_values = self.model.predict(features).reshape(-1)  # computing q-values using our fitted model
 
         if POLICY == "deterministic":
             return ACTION_TRANSLATE_REV[np.argmax(q_values)]
 
         elif POLICY == "stochastic":
-            # normalize the q_values, take care not to divide by zero (fall back to default probs)
-            if any(q_values != 0):
-                probs = np.exp(q_values) / np.sum(np.exp(q_values))
-            else:
-                self.logger.debug("Choosing action at random because q-values are all 0")
-                probs = DEFAULT_PROBS
-
-            # using a stochastic policy!
+            # use softmax to translate q-values to probabilities,
+            probs = np.exp(q_values) / np.sum(np.exp(q_values))
             return np.random.choice(ACTIONS, p=probs)
 
 
@@ -94,21 +83,18 @@ def state_to_features(game_state: dict) -> np.array:
     :param game_state:  A dictionary describing the current game board.
     :return: np.array
     """
-    # This is the game_state dict before the game begins and after it ends
+    # This is the game_state dict before the game begins and after it ends, so features cannot be extracted
     if game_state is None:
         return None
 
+    # TODO: What shape is required as input for CNN?
     if FEAT_ENG == "channels":
-
         object_map = game_state["field"]
 
-        # for the coin challenge we need to know where the agent is, where walls are and where the coins are
-        # so, we create a coin map in the same shape as the field
         coin_map = np.zeros_like(game_state["field"])
         for cx, cy in game_state["coins"]:
             coin_map[cx, cy] = 1
 
-        # also adding where one self is on the map
         self_map = np.zeros_like(game_state["field"])
         self_map[game_state["self"][3]] = 1
 
@@ -118,18 +104,18 @@ def state_to_features(game_state: dict) -> np.array:
         # create channels based on the field and coin information.
         channels = [object_map, self_map, coin_map, explosion_map]
 
-        # concatenate them as a feature tensor (they must have the same shape), ...
+        # concatenate them as a feature tensor
         stacked_channels = np.stack(channels)
+
         # and return them as a vector
         return stacked_channels.reshape(-1)
 
     elif FEAT_ENG == "standard":
 
-        # Situational awareness, indicating in which directions the agent can move
-        # Add is bomb action possible?
+        # 1. 1D array, len = 4: indicating in which directions the agent can move (up, right, down, left)
         awareness = get_awareness(object_position=game_state["field"], self_position=game_state["self"][3])
 
-        # Direction to the closest coin determined by BFS
+        # 2. 1D array, len = 4:  indicating in which direction lays the closest coin determined by BFS (up, right, down, left)
         coin_direction = get_coin_direction(object_position=game_state["field"], coin_list=game_state["coins"],
                                             self_position=game_state["self"][3])
 
@@ -137,20 +123,24 @@ def state_to_features(game_state: dict) -> np.array:
         explosion_map = get_bomb_map(object_position=game_state["field"], bomb_list=game_state["bombs"],
                                      explosion_position=game_state["explosion_map"])
 
-        # 1D array indicating whether current field, up, right, down, left are dangerous
+        # 3. 1D array, len = 5:  indicating how dangerous the current field, up, right, down, left are
         danger = get_danger(explosion_map=explosion_map, self_position=game_state["self"][3])
 
-        # 1D array indicating in which direction to flee from bomb if immediate danger
-        # if no immediate danger return 5 zeros or current spot is safe returns all zeros, otherwise direction
+        # 4. 1D array, len = 5:  indicating in which direction to flee from bomb if immediate danger (current, up, right, down, left),
+        # if no immediate danger/current spot is safe returns all zeros, otherwise direction
         safe_direction = get_safe_direction(object_position=game_state["field"], explosion_map=explosion_map,
                                             self_position=game_state["self"][3])
 
+        # 5. 1D array, len = 5:  indicating in which direction lays the most lucrative position for laying a bomb
+        # that destroys most crates penalized by the distance as determined by BFS (up, right, down, left)
         crate_direction = get_crate_direction(object_position=game_state["field"], bomb_list=game_state["bombs"],
                                               self_position=game_state["self"][3], explosion_map=explosion_map)
 
-        # 1D array indicating whether bomb can be dropped and survival is possible
+        # 6. 1D array, len = 2: indicating whether bomb can be dropped and survival is possible
         bomb_info = get_bomb_info(object_position=game_state["field"], explosion_map=explosion_map,
                                   self=game_state["self"], bomb_list=game_state["bombs"])
+
+        # TODO: Add other agents information, to aid attacking them
 
         features = np.concatenate([awareness,
                                    danger,
@@ -222,33 +212,25 @@ def coin_bfs(object_position, coin_position, self_position):
     explored = set()
     # add start to the Queue
     q.put(Node(position=self_position, parent_position=None, move=None))
-
     # loop over the queue as long as it is not empty
     while True:
         # if we cannot reach any revealed coin
-        if q.empty():
-            return None
-
+        if q.empty(): return None
         # always get first element
         node = q.get()
-
         # found a coin, trace back to parent, but not if coin is where initial position is
         if node.parent_position is not None and node.position in coin_position:
-            actions = []
-            cells = []
+            actions, cells = [], []
             # Backtracking: From each node grab state and action; and then redefine node as parent node
             while node.parent_position is not None:
                 actions.append(node.move)
                 cells.append(node.position)
                 node = node.parent_position
-            # Reverse is a method for lists that reverses the content
             actions.reverse()
             cells.reverse()
             return actions, cells
-
         explored.add(node.position)
-
-        # Add neighbors to frontier
+        # Add neighbors to fifo
         neighbors = get_neighbors(object_position, node.position)
         for action, neighbor in zip(neighbors["actions"], neighbors["neighbors"]):
             if neighbor not in explored and not q.contains_state(neighbor):
@@ -268,15 +250,12 @@ def save_bfs(object_position, explosion_map, self_position):
     explored = set()
     # add start to the Queue
     q.put(Node(position=self_position, parent_position=None, move=None, steps=0))
-
     # loop over the queue as long as it is not empty
     while True:
         if q.empty():
             return "dead"
-
         # always get first element
         node = q.get()
-
         # found a save position, either not danger or danger is already gone
         if explosion_map[node.position] == 0 or (explosion_map[node.position] + (node.steps * 1/6)) > 1:
             moves = []
@@ -286,14 +265,11 @@ def save_bfs(object_position, explosion_map, self_position):
                 moves.append(node.move)
                 cells.append(node.position)
                 node = node.parent_position
-            # Reverse is a method for lists that reverses the order
             moves.reverse()
             cells.reverse()
             return moves, cells
-
         explored.add(node.position)
-
-        # Add neighbors to frontier
+        # Add neighbors to fifo
         neighbors = get_neighbors(object_position, node.position)
         for action, neighbor in zip(neighbors["actions"], neighbors["neighbors"]):
             # make sure that we do not die on the way to the potential neighbor
@@ -303,8 +279,7 @@ def save_bfs(object_position, explosion_map, self_position):
                 q.put(child)
 
 
-# reduce default dist to make computations faster
-# TODO: Improve performance here
+# default dist can be reduced to make computations faster
 def crate_bfs(object_position, self_position, bomb_list, explosion_map, max_dist=14, distance_discount=1/4):
     """
     Find path to position where bomb destroys most crates via breadth-first search (BFS)
@@ -319,14 +294,11 @@ def crate_bfs(object_position, self_position, bomb_list, explosion_map, max_dist
     """
     q = Queue()
     explored = set()
-
     # initialize maximum yet
     top_considered_node = None
     top_score = -np.inf
-
     # add start to the Queue
     q.put(Node(position=self_position, parent_position=None, move=None))
-
     # loop over the queue as long as it is not empty
     while True:
         # when empty we will trace the path to our top node
@@ -336,45 +308,33 @@ def crate_bfs(object_position, self_position, bomb_list, explosion_map, max_dist
                 return None
             else:
                 node = top_considered_node
-                moves = []
-                cells = []
-                # Backtracking: From each node grab state and action; and then redefine node as parent node
+                moves, cells = [], []
                 while node.parent_position is not None:
                     moves.append(node.move)
                     cells.append(node.position)
                     node = node.parent_position
-                # Reverse is a method for lists that reverses the order
                 moves.reverse()
                 cells.reverse()
                 return moves, cells
-
         # always get first element
         node = q.get()
-
         # compute distance to current position
         dist_to_self = np.abs(np.array(node.position) - np.array(self_position)).sum()
-
         # only consider if escaping is possible at the current position
         if check_survival(object_position=object_position, bomb_list=bomb_list,
                           position=node.position, explosion_map=explosion_map):
-
             # compute number of destroyed crates
             destroyed_crates = get_destroyed_crates(object_position, node.position)
-
             # TODO: Think about how to compute this destruction score, taking 1/4 because bomb takes 4 steps to explode
             # combine distance and destroyed crates into a score
             destruction_score = destroyed_crates - distance_discount * dist_to_self
-
             # found a better position according to our destruction score
             if destruction_score > top_score and destroyed_crates >= 1:
                 top_considered_node = node
                 top_score = destruction_score
-
         explored.add(node.position)
-
         # if too far away do not consider adding the neighbors!
-        if dist_to_self < max_dist:
-            # Add neighbors to queue
+        if dist_to_self <= max_dist:
             neighbors = get_neighbors(object_position, node.position)
             for action, neighbor in zip(neighbors["actions"], neighbors["neighbors"]):
                 if neighbor not in explored and not q.contains_state(neighbor):
@@ -443,12 +403,12 @@ def check_survival(object_position, bomb_list, position, explosion_map):
 
 
 def get_awareness(object_position, self_position):
-    return np.array([
+    return (np.array([
         object_position[self_position[0] - 1, self_position[1]],  # up
         object_position[self_position[0], self_position[1] + 1],  # right
         object_position[self_position[0] + 1, self_position[1]],  # down
         object_position[self_position[0], self_position[1] - 1]   # left
-    ]) == 0
+    ]) == 0).astype(float)
 
 
 def get_coin_direction(object_position, coin_list, self_position):

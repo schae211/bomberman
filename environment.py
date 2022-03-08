@@ -632,6 +632,7 @@ class GUI:
     def make_video(self):
         # Turn screenshots into videos
         assert self.world.args.make_video is not False
+        #self.screenshot_dir = "/Users/philipp/Python_projects/bomberman_rl/screenshots"
 
         if self.world.args.make_video is True:
             files = [self.screenshot_dir / f'{self.world.round_id}_video.mp4',
@@ -648,10 +649,11 @@ class GUI:
         }
 
         for video_file in files:
+            self.world.args.fps = 10
             subprocess.call([
                 'ffmpeg', '-y', '-framerate', f'{self.world.args.fps}',
                 '-f', 'image2', '-pattern_type', 'glob',
-                '-i', self.screenshot_dir / f'{self.world.round_id}_*.png',
+                '-i', f"{self.screenshot_dir}/{self.world.round_id}_*.png",
                 *PARAMS[video_file.suffix],
                 video_file
             ])

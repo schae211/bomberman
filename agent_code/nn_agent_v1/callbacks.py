@@ -310,10 +310,12 @@ def save_bfs(object_position, explosion_map, self_position):
 
 # reduce default dist to make computations faster
 # TODO: Improve performance here
-def crate_bfs(object_position, self_position, bomb_list, explosion_map, max_dist=10):
+def crate_bfs(object_position, self_position, bomb_list, explosion_map, max_dist=14, distance_discount=1/4):
     """
     Find path to position where bomb destroys most crates via breadth-first search (BFS)
     Thereby, we have to take the distance to the considered positions into consideration (trade-off!)
+    :param bomb_list:
+    :param distance_discount:
     :param explosion_map:
     :param max_dist:
     :param object_position:
@@ -366,10 +368,10 @@ def crate_bfs(object_position, self_position, bomb_list, explosion_map, max_dist
 
             # TODO: Think about how to compute this destruction score, taking 1/4 because bomb takes 4 steps to explode
             # combine distance and destroyed crates into a score
-            destruction_score = destroyed_crates - 1/4 * dist_to_self
+            destruction_score = destroyed_crates - distance_discount * dist_to_self
 
             # found a better position according to our destruction score
-            if destruction_score > top_score:
+            if destruction_score > top_score and destroyed_crates >= 1:
                 top_considered_node = node
                 top_score = destruction_score
 
@@ -555,9 +557,8 @@ def get_crate_direction(object_position, bomb_list, self_position, explosion_map
                            bomb_list=bomb_list, explosion_map=explosion_map)
 
     if crate_info is not None:  # None is returned if destruction score was negative for all considered positions
-        crate_direction[0] = 1              # indicating that target was found
         if crate_info == ([], []):          # current position
-            pass
+            crate_direction[0] = 1
         elif crate_info[0][0] == "up":
             crate_direction[1] = 1
         elif crate_info[0][0] == "right":

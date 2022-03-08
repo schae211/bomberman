@@ -17,7 +17,7 @@ configs = {
     # storing the last x transition as replay buffer fo r training
     "MEMORY_SIZE": 10_000,
     # how many transitions should be sampled from the memory to train the model
-    "BATCH_SIZE": 1024,  # 128
+    "BATCH_SIZE": 256,  # 1024,  # 128
     # use "deterministic" or "stochastic" policy
     "POLICY": "deterministic",
     # default probabilities for the actions [up, right, down, left, wait, bomb]

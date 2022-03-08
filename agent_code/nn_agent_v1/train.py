@@ -43,7 +43,8 @@ GAME_SIZE = 17
 
 # specify argument whether training statistics should be saved
 SAVE_TRAIN = True
-SAVE_EVERY = 50
+SAVE_EVERY = 200
+INCLUDE_EVERY = 4 # only include every x episode in the saved stats
 SAVE_DIR = configs["MODEL_LOC"]
 if SAVE_TRAIN:
     step_information = {"round": [], "step": [], "events": [], "reward": []}
@@ -106,24 +107,23 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
                                       state_to_features(new_game_state),  # next_state
                                       rewards))  # reward
 
+
         # use global step information variable
-        step_information["round"].append(old_game_state["round"])
-        step_information["step"].append(old_game_state["step"])
-        step_information["events"].append("| ".join(map(repr, events)))
-        step_information["reward"].append(rewards)
+        if (old_game_state["round"] % INCLUDE_EVERY) == 0:
+            step_information["round"].append(old_game_state["round"])
+            step_information["step"].append(old_game_state["step"])
+            step_information["events"].append("| ".join(map(repr, events)))
+            step_information["reward"].append(rewards)
 
         # keep status of last N steps for reward shaping
         self.last_states.append(old_game_state["self"][3])
 
     # first game state, can still be used by using the round information from the new game state
-    elif new_game_state:
+    elif new_game_state and (new_game_state["round"] % INCLUDE_EVERY) == 0:
         step_information["round"].append(new_game_state["round"])
         step_information["step"].append(0)
         step_information["events"].append("| ".join(map(repr, events)))
         step_information["reward"].append(0)
-
-    # if True:
-    #    events.append(PLACEHOLDER_EVENT)
 
 
 def end_of_round(self, last_game_state: dict, last_action: str, events: List[str]):
@@ -149,10 +149,11 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
                                   reward_from_events(self, events, last_game_state, None)))
 
     global step_information
-    step_information["round"].append(last_game_state["round"])
-    step_information["step"].append(last_game_state["step"])
-    step_information["events"].append("| ".join(map(repr, events)))
-    step_information["reward"].append(reward_from_events(self, events, last_game_state, None))
+    if (last_game_state["round"] % INCLUDE_EVERY) == 0:
+        step_information["round"].append(last_game_state["round"])
+        step_information["step"].append(last_game_state["step"])
+        step_information["events"].append("| ".join(map(repr, events)))
+        step_information["reward"].append(reward_from_events(self, events, last_game_state, None))
 
     if last_game_state["round"] % SAVE_EVERY == 0:
         pd.DataFrame(step_information).to_csv(f"{SAVE_DIR}/{SAVE_TIME}_{SAVE_KEY}_game_stats.csv", index=False)
@@ -307,45 +308,6 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
             else:
                 events.append(e.STAY_IN_BOMB)
 
-    # penalize if bomb was placed without escape route
-    if old_game_state and e.BOMB_DROPPED:
-        # get information about affected areas meaning where bombs are about to explode and where it is still dangerous
-        explosion_map = get_bomb_map(old_game_state["field"], old_game_state["bombs"], old_game_state["explosion_map"])
-        bomb_position = old_game_state["self"][3]
-        explosion_map[bomb_position] += 1
-        # check above
-        for up_x in range(bomb_position[0] - 1, bomb_position[0] - 4, -1):
-            if 0 <= up_x <= 16:
-                if old_game_state["field"][up_x, bomb_position[1]] == -1:
-                    break
-                else:
-                    explosion_map[up_x, bomb_position[1]] += 1
-        # check below
-        for down_x in range(bomb_position[0] + 1, bomb_position[0] + 4, 1):
-            if 0 <= down_x <= 16:
-                if old_game_state["field"][down_x, bomb_position[1]] == -1:
-                    break
-                else:
-                    explosion_map[down_x, bomb_position[1]] += 1
-        # check to the left
-        for left_y in range(bomb_position[1] - 1, bomb_position[1] - 4, -1):
-            if 0 <= left_y <= 16:
-                if old_game_state["field"][bomb_position[0], left_y] == -1:
-                    break
-                else:
-                    explosion_map[bomb_position[0], left_y] += 1
-        # check to the right
-        for right_y in range(bomb_position[1] + 1, bomb_position[1] + 4, 1):
-            if 0 <= right_y <= 16:
-                if old_game_state["field"][bomb_position[0], right_y] == -1:
-                    break
-                else:
-                    explosion_map[bomb_position[0], right_y] += 1
-        explosion_map = np.where(explosion_map > 0, 1, 0)
-        if save_bfs(object_position=old_game_state["field"], explosion_map=explosion_map,
-                    self_position=old_game_state["self"][3]) == "dead":
-            events.append(e.SUICIDE_BOMB)
-
     # check whether agent stayed in the same spot for too long (3 out of 5)
     if new_game_state:
         check_same_pos = np.array([state == new_game_state["self"][3] for state in self.last_states]).sum()
@@ -353,22 +315,15 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
             events.append(e.MOVE_IN_CIRCLES)
 
     game_rewards = {
-        e.COIN_COLLECTED: 9,
-        e.KILLED_SELF: -15,
+        e.COIN_COLLECTED: 5,
+        e.KILLED_SELF: -20,
         e.INVALID_ACTION: -2,
         e.WAITED: -0.5,
         e.MOVE_TO_COIN: 1,
         e.MOVE_FROM_COIN: -1,
         e.MOVE_IN_CIRCLES: -1,
         e.CRATE_DESTROYED: 2,
-        # e.SUICIDE_BOMB: -100,
-        # e.ESCAPE_FROM_BOMB: 10,
-        # e.STAY_IN_BOMB: -10,
-        # e.MOVED_LEFT: -2,
-        # e.MOVED_RIGHT: -2,
-        # e.MOVED_UP: -2,
-        # e.MOVED_DOWN: -2,
-        e.COIN_FOUND: 1.5,
+        e.COIN_FOUND: 2,
     }
     reward_sum = 0
     for event in events:

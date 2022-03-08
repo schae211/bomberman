@@ -32,8 +32,8 @@ SCENARIOS = {
 MAX_AGENTS = 4
 
 # TODO: tweak here
-# MAX_STEPS = 400
-MAX_STEPS = 200
+MAX_STEPS = 400
+# MAX_STEPS = 200
 
 # GUI properties
 GRID_SIZE = 30

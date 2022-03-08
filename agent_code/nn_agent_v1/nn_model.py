@@ -13,7 +13,7 @@ if configs["LOSS"] == "huber":
 elif configs["LOSS"] == "mse":
     LOSS_FUNCTION = nn.MSELoss()
 LEARNING_RATE = 0.0001
-LOAD = True
+LOAD = False
 # play --no-gui --n-rounds 10000 --agents n_step_agent_v3 --train 1 --scenario crate_heaven
 
 

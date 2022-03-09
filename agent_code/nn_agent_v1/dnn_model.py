@@ -50,7 +50,11 @@ class DoubleNNModel(nn.Module):
     def update_target(self):
         self.target_net.load_state_dict(self.policy_net.state_dict())
 
-    def predict(self, state: np.ndarray) -> np.ndarray:
+    def predict_policy(self, state: np.ndarray) -> np.ndarray:
+        self.policy_net.eval()
+        return self.policy_net(torch.Tensor(state).to(device)).detach().cpu().numpy()
+
+    def predict_target(self, state: np.ndarray) -> np.ndarray:
         self.target_net.eval()
         return self.target_net(torch.Tensor(state).to(device)).detach().cpu().numpy()
 

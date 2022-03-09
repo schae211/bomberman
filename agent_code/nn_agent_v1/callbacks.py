@@ -61,7 +61,7 @@ def act(self, game_state: dict) -> str:
     else:
         self.logger.debug("Querying fitted model for action.")
         features = state_to_features(game_state).reshape(1, -1)  # .reshape(1, -1) needed if single sample for MultiOutputRegressor
-        q_values = self.model.predict(features).reshape(-1)  # computing q-values using our fitted model
+        q_values = self.model.predict_policy(features).reshape(-1)  # computing q-values using our fitted model
 
         if POLICY == "deterministic":
             action = ACTION_TRANSLATE_REV[np.argmax(q_values)]

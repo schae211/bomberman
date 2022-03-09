@@ -201,16 +201,16 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         # standard case: non-terminal state and model is fit
         if self.memory[len(rewards) - 1].next_state is not None:
             q_update = n_steps_reward + GAMMA ** N * \
-                       np.amax(self.model.predict(self.memory[len(rewards) - 1].next_state.reshape(1, -1)))
+                       np.amax(self.model.predict_target(self.memory[len(rewards) - 1].next_state.reshape(1, -1)))
             # use the model to predict all the other q_values
             # (below we replace the q_value for the selected action with this q_update)
-            q_values = self.model.predict(state.reshape(1, -1)).reshape(-1)
+            q_values = self.model.predict_policy(state.reshape(1, -1)).reshape(-1)
         # if we have a terminal state in the next states we cannot predict q-values for the terminal state
         else:
             q_update = n_steps_reward
             # use the model to predict all the other q_values
             # (below we replace the q_value for the selected action with this q_update)
-            q_values = self.model.predict(state.reshape(1, -1)).reshape(-1)
+            q_values = self.model.predict_policy(state.reshape(1, -1)).reshape(-1)
 
         # for the action that we actually took update the q-value according to above
         q_values[action] = q_update
@@ -232,7 +232,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     global episode_information
     if last_game_state:
         episode_information["round"].append(last_game_state["round"])
-        TS_MSE = ((self.model.predict(x_reshaped) - y_reshaped) ** 2).mean(axis=0)
+        TS_MSE = ((self.model.predict_policy(x_reshaped) - y_reshaped) ** 2).mean(axis=0)
         episode_information["TS_MSE_1"].append(TS_MSE[0])
         episode_information["TS_MSE_2"].append(TS_MSE[1])
         episode_information["TS_MSE_3"].append(TS_MSE[2])
@@ -345,13 +345,13 @@ def get_priority(self):
         # standard case: non-terminal state and model is fit
         if self.memory[len(rewards) - 1].next_state is not None:
             q_update = n_steps_reward + GAMMA ** N * \
-                       np.amax(self.model.predict(self.memory[len(rewards) - 1].next_state.reshape(1, -1)))
-            q_values = self.model.predict(state.reshape(1, -1)).reshape(-1)
+                       np.amax(self.model.predict_target(self.memory[len(rewards) - 1].next_state.reshape(1, -1)))
+            q_values = self.model.predict_policy(state.reshape(1, -1)).reshape(-1)
 
         # if we have a terminal state in the next states we cannot predict q-values for the terminal state
         else:
             q_update = n_steps_reward
-            q_values = self.model.predict(state.reshape(1, -1)).reshape(-1)
+            q_values = self.model.predict_policy(state.reshape(1, -1)).reshape(-1)
 
         temporal_differences[i] = np.abs(q_update - q_values[action])
 

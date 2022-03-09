@@ -35,7 +35,11 @@ class NNModel(nn.Module):
             self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=LEARNING_RATE)
         self.model.to(device)
 
-    def predict(self, state: np.ndarray) -> np.ndarray:
+    def predict_policy(self, state: np.ndarray) -> np.ndarray:
+        self.model.eval()
+        return self.model(torch.Tensor(state).to(device)).detach().cpu().numpy()
+
+    def predict_target(self, state: np.ndarray) -> np.ndarray:
         self.model.eval()
         return self.model(torch.Tensor(state).to(device)).detach().cpu().numpy()
 

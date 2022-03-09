@@ -55,7 +55,7 @@ if SAVE_TRAIN:
 LAST_STATES = 5
 
 #
-PRIORITIZED_REPLAY = True
+PRIORITIZED_REPLAY = configs.PRIORITIZED_REPLAY
 
 
 def setup_training(self):

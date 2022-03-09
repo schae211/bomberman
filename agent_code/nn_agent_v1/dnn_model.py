@@ -13,7 +13,7 @@ if configs.LOSS == "huber":
 elif configs.LOSS == "mse":
     LOSS_FUNCTION = nn.MSELoss()
 LEARNING_RATE = configs.LEARNING_RATE
-LOAD = True
+LOAD = False
 
 
 # Set device

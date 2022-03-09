@@ -43,6 +43,13 @@ class NNModel(nn.Module):
         self.model.eval()
         return self.model(torch.Tensor(state).to(device)).detach().cpu().numpy()
 
+    def update_target(self):
+        """
+        Not implemented for normal DQN approach
+        :return:
+        """
+        pass
+
     def fit(self, X: np.ndarray, y: np.ndarray) -> float:
         """
         Trains the model on a batch of data

@@ -158,6 +158,10 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     if last_game_state["round"] % SAVE_EVERY == 0:
         pd.DataFrame(step_information).to_csv(f"{SAVE_DIR}/{SAVE_TIME}_{SAVE_KEY}_game_stats.csv", index=False)
 
+    # updating the target network
+    if last_game_state["round"] % configs.UPDATE_FREQ == 0:
+        self.model.update_target()
+
     # initialize our x and y which we use for fitting later on
     x, y = [], []
 

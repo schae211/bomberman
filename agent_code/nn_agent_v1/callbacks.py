@@ -32,12 +32,12 @@ def setup(self):
     """
     if self.train or not os.path.isfile("my-saved-model.pt"):
         self.logger.info("Setting up model from scratch.")
-        self.model = NNModel()
-        #self.model = DoubleNNModel()
+        #self.model = NNModel()
+        self.model = DoubleNNModel()
     else:
         self.logger.info("Loading model from saved state.")
-        self.model = NNModel()
-        #self.model = DoubleNNModel()
+        #self.model = NNModel()
+        self.model = DoubleNNModel()
 
 
 def act(self, game_state: dict) -> str:

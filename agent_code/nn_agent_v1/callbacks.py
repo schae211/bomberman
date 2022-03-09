@@ -398,7 +398,7 @@ def get_destroyed_crates(object_position, bomb_position):
 
 def check_survival(object_position, bomb_list, position, explosion_map):
     bomb_list_tmp = bomb_list.copy()
-    bomb_list_tmp.append(((position), 4))
+    bomb_list_tmp.append(((position), 3))
     # add information about whether dropping a bomb is suicide
     updated_explosion_map = get_bomb_map(object_position=object_position,
                                          bomb_list=bomb_list_tmp,
@@ -538,7 +538,7 @@ def get_crate_direction(object_position, bomb_list, self_position, explosion_map
 
 def get_bomb_info(object_position, explosion_map, bomb_list, self):
     """
-    Compute vector of lenght 2 where the positions indicate:
+    Compute vector of length 2 where the positions indicate:
     0: 1 if bomb action possible else 0
     1: 1 if bomb action does NOT lead to suicide else 0
     :param object_position:

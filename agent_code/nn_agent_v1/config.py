@@ -38,3 +38,6 @@ configs = edict({
 SAVE_KEY = f'{configs["AGENT"]}_{configs["EPSILON"]}_{configs["EPSILON_DECAY"]}_{configs["EPSILON_MIN"]}_{configs["GAMMA"]}_{configs["N_STEPS"]}_{configs["MEMORY_SIZE"]}_{configs["BATCH_SIZE"]}_{configs["POLICY"]}_{configs["FEATURE_ENGINEERING"]}_{configs["LOSS"]}_{configs["LEARNING_RATE"]}_{configs["PRIORITIZED_REPLAY"]}'
 SAVE_TIME = datetime.now().strftime("%d-%m-%Y-%H-%M")
 
+# TODO:
+# Include reward information in the config files, we have to gather all tunable parameters in one file, this way
+# we can ensure that we keep track of the things we already tested in the past.

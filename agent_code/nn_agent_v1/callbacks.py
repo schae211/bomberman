@@ -54,14 +54,20 @@ def act(self, game_state: dict) -> str:
     episode_n = 0 if game_state is None else game_state["round"]
     if self.train and np.random.rand() <= max(self.epsilon_min, self.epsilon * self.epsilon_reduction ** episode_n):
         self.logger.debug("Choosing action at random due to epsilon-greedy policy")
-        return np.random.choice(ACTIONS, p=DEFAULT_PROBS)
+        action = np.random.choice(ACTIONS, p=DEFAULT_PROBS)
+        if action == "BOMB":
+            break_here = 0
+        return action
     else:
         self.logger.debug("Querying fitted model for action.")
         features = state_to_features(game_state).reshape(1, -1)  # .reshape(1, -1) needed if single sample for MultiOutputRegressor
         q_values = self.model.predict(features).reshape(-1)  # computing q-values using our fitted model
 
         if POLICY == "deterministic":
-            return ACTION_TRANSLATE_REV[np.argmax(q_values)]
+            action = ACTION_TRANSLATE_REV[np.argmax(q_values)]
+            if action == "BOMB":
+                break_here = 0
+            return action
 
         elif POLICY == "stochastic":
             # use softmax to translate q-values to probabilities,
@@ -148,6 +154,9 @@ def state_to_features(game_state: dict) -> np.array:
                                    coin_direction,
                                    crate_direction,
                                    bomb_info])
+
+        if game_state["explosion_map"].sum() > 0:
+            break_here = 0
 
         return features
 
@@ -257,7 +266,7 @@ def save_bfs(object_position, explosion_map, self_position):
         # always get first element
         node = q.get()
         # found a save position, either not danger or danger is already gone
-        if explosion_map[node.position] == 0 or (explosion_map[node.position] + (node.steps * 1/6)) > 1:
+        if explosion_map[node.position] == 0 or (explosion_map[node.position] + (node.steps * 1/5)) > 1:
             moves = []
             cells = []
             # Backtracking: From each node grab state and action; and then redefine node as parent node
@@ -272,8 +281,8 @@ def save_bfs(object_position, explosion_map, self_position):
         # Add neighbors to fifo
         neighbors = get_neighbors(object_position, node.position)
         for action, neighbor in zip(neighbors["actions"], neighbors["neighbors"]):
-            # make sure that we do not die on the way to the potential neighbor
-            if neighbor not in explored and not q.contains_state(neighbor) and not 5/6 <= (explosion_map[neighbor] + ((node.steps+1) * 1/6)) <= 1:
+            # make sure that we do not die on the way to the potential neighbor (states 4/5 and 5/5 are deadly!)
+            if neighbor not in explored and not q.contains_state(neighbor) and not 4/5 <= (explosion_map[neighbor] + ((node.steps+1) * 1/5)) <= 1:
                 # TODO: Check whether steps is really always + 1, but should make sense in BFS
                 child = Node(position=neighbor, parent_position=node, move=action, steps=node.steps+1)
                 q.put(child)
@@ -436,14 +445,14 @@ def get_coin_direction(object_position, coin_list, self_position):
 def get_bomb_map(object_position, bomb_list, explosion_position):
     # get information about affected areas meaning where bombs are about to explode and where it is still dangerous
     explosion_map = explosion_position.copy().astype(float)
-    ctd_to_score = lambda ctd: 5/6 - (1/6 * ctd)
+    ctd_to_score = lambda ctd: 4/5 - (1/5 * ctd)
     if bomb_list is None:
         return explosion_map
     else:
         bombs = bomb_list.copy()
         for bomb_pos, bomb_ctd in bombs:
             # position of the bomb itself
-            explosion_map[bomb_pos] = max(explosion_map[bomb_pos], ctd_to_score(bomb_ctd))
+            explosion_map[bomb_pos] = max(explosion_map[bomb_pos], ctd_to_score(bomb_ctd))  # max ensure not to overwrite the game state explosion map
             # check above
             for up_x in range(bomb_pos[0] - 1, bomb_pos[0] - 4, -1):
                 if 0 <= up_x <= 16:

@@ -13,7 +13,7 @@ if configs.LOSS == "huber":
 elif configs.LOSS == "mse":
     LOSS_FUNCTION = nn.MSELoss()
 LEARNING_RATE = configs.LEARNING_RATE
-LOAD = True
+LOAD = False
 
 
 # Set device
@@ -31,9 +31,9 @@ class DoubleNNModel(nn.Module):
         super(DoubleNNModel, self).__init__()
         if LOAD:
             print("LOAD MODEL")
-            self.policy_net = torch.load("agent_code/nn_agent_v1/model.pt",
+            self.policy_net = torch.load("/Users/philipp/Python_projects/bomberman_rl/agent_code/nn_agent_v1/model.pt",
                                     map_location=torch.device('cpu'))
-            self.target_net = torch.load("agent_code/nn_agent_v1/model.pt",
+            self.target_net = torch.load("/Users/philipp/Python_projects/bomberman_rl/agent_code/nn_agent_v1/model.pt",
                                     map_location=torch.device('cpu'))
             self.target_net.load_state_dict(self.policy_net.state_dict())
             self.target_net.eval()

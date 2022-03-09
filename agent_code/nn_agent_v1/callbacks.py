@@ -512,8 +512,9 @@ def get_crate_direction(object_position, bomb_list, self_position, explosion_map
                            bomb_list=bomb_list, explosion_map=explosion_map)
 
     if crate_info is not None:  # None is returned if destruction score was negative for all considered positions
-        if crate_info == ([], []):          # current position
-            crate_direction[0] = 1
+        crate_direction[0] = 1              # indicating that a target was found
+        if crate_info == ([], []):          # if current position, keep all directional indicators 0
+            pass
         elif crate_info[0][0] == "up":
             crate_direction[1] = 1
         elif crate_info[0][0] == "right":

@@ -20,7 +20,7 @@ feature_description = [
     "coin_direction_right",
     "coin_direction_down",
     "coin_direction_left",
-    "crate_direction_current",
+    "create_target_found",
     "crate_direction_up",
     "crate_direction_right",
     "crate_direction_down",

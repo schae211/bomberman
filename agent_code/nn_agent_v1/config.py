@@ -6,7 +6,7 @@ import os
 configs = edict({
     "AGENT": "dnn-v1",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
-    "EPSILON": 0.4,
+    "EPSILON": 0.2,
     # epsilon-greedy strategy decay parameter: epsilon(t) := epsilon(t-1) * decay^(#episode)
     "EPSILON_DECAY": 0.999,
     # epsilon-greedy strategy minimum epsilon: epsilon(t) := max(0.05, epsilon(t-1) * decay^(#episode))

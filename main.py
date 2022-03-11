@@ -31,6 +31,7 @@ class Timekeeper:
 
 def world_controller(world, n_rounds, /,
                      gui, every_step, turn_based, make_video, update_interval):
+    # update_interval = 1/4
     if make_video and not gui.screenshot_dir.exists():
         gui.screenshot_dir.mkdir()
 

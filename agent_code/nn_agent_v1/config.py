@@ -6,9 +6,9 @@ import os
 configs = edict({
     "AGENT": "dnn-v1",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
-    "EPSILON": 0.2,
+    "EPSILON": 1,
     # epsilon-greedy strategy decay parameter: epsilon(t) := epsilon(t-1) * decay^(#episode)
-    "EPSILON_DECAY": 0.999,
+    "EPSILON_DECAY": 0.9998,
     # epsilon-greedy strategy minimum epsilon: epsilon(t) := max(0.05, epsilon(t-1) * decay^(#episode))
     "EPSILON_MIN": 0.05,
     # discount factor gamma, which discount future rewards
@@ -24,7 +24,7 @@ configs = edict({
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "minimal"}
-    "FEATURE_ENGINEERING": "standard",
+    "FEATURE_ENGINEERING": "channels",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
@@ -41,5 +41,5 @@ SAVE_KEY = f'{configs["AGENT"]}_{configs["EPSILON"]}_{configs["EPSILON_DECAY"]}_
 SAVE_TIME = datetime.now().strftime("%d-%m-%Y-%H-%M")
 
 # TODO:
-# Include reward information in the config files, we have to gather all tunable parameters in one file, this way
-# we can ensure that we keep track of the things we already tested in the past.
+#  Include reward information in the config files, we have to gather all tunable parameters in one file, this way
+#  we can ensure that we keep track of the things we already tested in the past.

@@ -21,14 +21,14 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
 
 
-class DoubleNNModel(nn.Module):
+class DoubleCNNModel(nn.Module):
     """
     Implementation of target network, which is used to compute the expected Q values and value/policy network,
     which is updated in each learning iteration. The "older" target network is updated with the
     "value network" every x steps to keep it current
     """
     def __init__(self):
-        super(DoubleNNModel, self).__init__()
+        super(DoubleCNNModel, self).__init__()
         if LOAD:
             print("LOAD MODEL")
             self.policy_net = torch.load("/Users/philipp/Python_projects/bomberman_rl/agent_code/nn_agent_v1/model.pt",
@@ -39,8 +39,8 @@ class DoubleNNModel(nn.Module):
             self.target_net.eval()
         else:
             print("INITIALIZE MODEL")
-            self.policy_net = MLP(input_size=25, output_size=6, hidden_size=128)
-            self.target_net = MLP(input_size=25, output_size=6, hidden_size=128)
+            self.policy_net = CNN(input_channel=4)
+            self.target_net = CNN(input_channel=4)
             self.target_net.load_state_dict(self.policy_net.state_dict())
             self.optimizer = torch.optim.AdamW(self.policy_net.parameters(), lr=LEARNING_RATE)
         self.policy_net.to(device)
@@ -92,6 +92,51 @@ class DoubleNNModel(nn.Module):
 
         return loss
 
+class ConvMaxPool(nn.Module):
+    def __init__(self, input_channel, output_channel, max_pooling=True, padding='same', kernel_size=(3, 3)):
+        super(ConvMaxPool, self).__init__()
+        self.conv = nn.Conv2d(in_channels=input_channel, out_channels=output_channel, kernel_size=kernel_size,
+                              padding=padding)
+        self.activation = nn.ReLU()
+        if max_pooling:
+            self.max_pooling = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2), padding=1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.conv(x)
+        x = self.activation(x)
+        if hasattr(self, 'max_pooling'):
+            x = self.max_pooling(x)
+        return x
+
+
+class CNN(nn.Module):
+    def __init__(self, input_channel=4):
+        super(CNN, self).__init__()
+        self.cnn_layer = nn.Sequential(ConvMaxPool(input_channel=input_channel, output_channel=8,
+                                             max_pooling=False),
+                                 ConvMaxPool(input_channel=8, output_channel=16,
+                                             max_pooling=True),
+                                 ConvMaxPool(input_channel=16, output_channel=32,
+                                             max_pooling=True),
+                                ConvMaxPool(input_channel=32, output_channel=32,
+                                            max_pooling=True)
+                                       )
+        self.flatten_layer = nn.Flatten()
+        self.mlp = MLP(input_size=288)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the neural network.
+        Args:
+            x: [batch_size, input_channel, height, width] tensor
+
+        Returns: [batch_size, output_size] tensor
+        """
+        x = self.cnn_layer(x)
+        x = self.flatten_layer(x)
+        x = self.mlp(x)
+        return x
+
 
 class MLP(nn.Module):
     def __init__(self, input_size=25, output_size=6, hidden_size=128):
@@ -102,7 +147,7 @@ class MLP(nn.Module):
                                  nn.ReLU(),
                                  nn.Linear(hidden_size, output_size))
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the neural network.
         Args:

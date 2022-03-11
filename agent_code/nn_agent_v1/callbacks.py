@@ -3,6 +3,7 @@ import pickle
 import numpy as np
 from agent_code.nn_agent_v1.nn_model import NNModel
 from agent_code.nn_agent_v1.dnn_model import DoubleNNModel
+from agent_code.nn_agent_v1.cnn_model import DoubleCNNModel
 from agent_code.nn_agent_v1.config import configs
 
 # helper lists and dictionaries for actions
@@ -33,11 +34,13 @@ def setup(self):
     if self.train or not os.path.isfile("my-saved-model.pt"):
         self.logger.info("Setting up model from scratch.")
         #self.model = NNModel()
-        self.model = DoubleNNModel()
+        #self.model = DoubleNNModel()
+        self.model = DoubleCNNModel()
     else:
         self.logger.info("Loading model from saved state.")
         #self.model = NNModel()
-        self.model = DoubleNNModel()
+        #self.model = DoubleNNModel()
+        self.model = DoubleCNNModel()
 
 
 def act(self, game_state: dict) -> str:
@@ -60,7 +63,7 @@ def act(self, game_state: dict) -> str:
         return action
     else:
         self.logger.debug("Querying fitted model for action.")
-        features = state_to_features(game_state).reshape(1, -1)  # .reshape(1, -1) needed if single sample for MultiOutputRegressor
+        features = state_to_features(game_state)  #.reshape(1, -1)  # .reshape(1, -1) needed if single sample for MultiOutputRegressor
         q_values = self.model.predict_policy(features).reshape(-1)  # computing q-values using our fitted model
 
         if POLICY == "deterministic":
@@ -114,7 +117,7 @@ def state_to_features(game_state: dict) -> np.array:
         stacked_channels = np.stack(channels)
 
         # and return them as a vector
-        return stacked_channels.reshape(-1)
+        return stacked_channels[None,:,:,:]
 
     elif FEAT_ENG == "standard":
 

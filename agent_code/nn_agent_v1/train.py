@@ -204,17 +204,23 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
         # standard case: non-terminal state and model is fit
         if self.memory[len(rewards) - 1].next_state is not None:
+            #q_update = n_steps_reward + GAMMA ** N * \
+            #           np.amax(self.model.predict_target(self.memory[len(rewards) - 1].next_state.reshape(1, -1)))
             q_update = n_steps_reward + GAMMA ** N * \
-                       np.amax(self.model.predict_target(self.memory[len(rewards) - 1].next_state.reshape(1, -1)))
+                       np.amax(self.model.predict_target(self.memory[len(rewards) - 1].next_state))
             # use the model to predict all the other q_values
             # (below we replace the q_value for the selected action with this q_update)
-            q_values = self.model.predict_policy(state.reshape(1, -1)).reshape(-1)
+
+            #q_values = self.model.predict_policy(state.reshape(1, -1)).reshape(-1)
+            q_values = self.model.predict_policy(state).reshape(-1)
         # if we have a terminal state in the next states we cannot predict q-values for the terminal state
         else:
             q_update = n_steps_reward
             # use the model to predict all the other q_values
             # (below we replace the q_value for the selected action with this q_update)
-            q_values = self.model.predict_policy(state.reshape(1, -1)).reshape(-1)
+
+            #q_values = self.model.predict_policy(state.reshape(1, -1)).reshape(-1)
+            q_values = self.model.predict_policy(state).reshape(-1)
 
         # for the action that we actually took update the q-value according to above
         q_values[action] = q_update
@@ -227,7 +233,8 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     self.logger.debug(f"Fitting the model using the input as specified below:")
 
     # reshape our predictors and checking the shape
-    x_reshaped = np.stack(x, axis=0)
+    # FIXME: Only working for Conv!
+    x_reshaped = np.stack(x, axis=0)[:,0,:,:,:]
     y_reshaped = np.stack(y, axis=0)
     self.logger.debug(f"Shape x_reshape: {x_reshaped.shape}")
     self.logger.debug(f"Shape y_reshape: {y_reshaped.shape}")
@@ -348,14 +355,18 @@ def get_priority(self):
 
         # standard case: non-terminal state and model is fit
         if self.memory[len(rewards) - 1].next_state is not None:
+            #q_update = n_steps_reward + GAMMA ** N * \
+            #           np.amax(self.model.predict_target(self.memory[len(rewards) - 1].next_state.reshape(1, -1)))
+            #q_values = self.model.predict_policy(state.reshape(1, -1)).reshape(-1)
             q_update = n_steps_reward + GAMMA ** N * \
-                       np.amax(self.model.predict_target(self.memory[len(rewards) - 1].next_state.reshape(1, -1)))
-            q_values = self.model.predict_policy(state.reshape(1, -1)).reshape(-1)
+                       np.amax(self.model.predict_target(self.memory[len(rewards) - 1].next_state))
+            q_values = self.model.predict_policy(state).reshape(-1)
 
         # if we have a terminal state in the next states we cannot predict q-values for the terminal state
         else:
             q_update = n_steps_reward
-            q_values = self.model.predict_policy(state.reshape(1, -1)).reshape(-1)
+            #q_values = self.model.predict_policy(state.reshape(1, -1)).reshape(-1)
+            q_values = self.model.predict_policy(state).reshape(-1)
 
         temporal_differences[i] = np.abs(q_update - q_values[action])
 

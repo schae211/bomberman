@@ -20,7 +20,7 @@ configs = edict({
     # storing the last x transition as replay buffer fo r training
     "MEMORY_SIZE": 10_000,
     # how many transitions should be sampled from the memory to train the model
-    "SAMPLE_SIZE": 320,
+    "SAMPLE_SIZE": 128,
     # should we exploit symmetries to augment the training data
     "TS_AUGMENTATION": True,
     # what batch size should be used to train the model

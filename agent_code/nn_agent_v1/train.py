@@ -329,6 +329,7 @@ def get_priority(self):
 def get_augmented_TS(FEAT_ENG, TS_X, TS_y):
     Augmented_X = np.zeros([TS_X.shape[0]*4] + feature_specs[configs.FEATURE_ENGINEERING].shape)
     Augmented_y = np.zeros((TS_X.shape[0]*4, 6))
+
     if FEAT_ENG == "channels":
         for num_rot in range(4):
             Augmented_X[num_rot*TS_X.shape[0]:(num_rot+1)*TS_X.shape[0],:] = \
@@ -338,12 +339,18 @@ def get_augmented_TS(FEAT_ENG, TS_X, TS_y):
         return Augmented_X, Augmented_y
 
     elif FEAT_ENG == "standard":
-        raise NotImplementedError
+        for num_rot in range(4):
+            Augmented_X[num_rot*TS_X.shape[0]:(num_rot+1)*TS_X.shape[0],:] = \
+                rotated_standard_features(num_rot, TS_X)
+            Augmented_y[num_rot*TS_X.shape[0]:(num_rot+1)*TS_X.shape[0],:] = \
+                rotated_actions(num_rot, TS_y)
+        return Augmented_X, Augmented_y
 
 
 def rotated_actions(rot, TS_y):
     """
     rotation as defined in the unit circle (so to the left)
+    reading from top to bottom, e.g. up (first index) becomes after 90° left (fourth index), and after 180° down (third index)
     mapping from default action sequence:   ["UP", "RIGHT", "DOWN", "LEFT", "WAIT", "BOMB"]
                                                0      1       2        3       4       5
     to 90° rotation:                        ["LEFT", "UP", "RIGHT", "DOWN", "WAIT", "BOMB"]
@@ -354,30 +361,51 @@ def rotated_actions(rot, TS_y):
     :param q_values: np.array with shape = (#actions,)
     :return: q_values: np.array with shape = (#actions,) adjusted according to the rotation
     """
+    order_orig = [0, 1, 2, 3, 4, 5]
+    order_90 =   [1, 2, 3, 0, 4, 5]
+    order_180 =  [2, 3, 0, 1, 4, 5]
+    order_270 =  [3, 0, 1, 2, 4, 5]
+
     rotated_y = np.zeros_like(TS_y)
     if rot == 0:
-        rotated_y = TS_y
+        rotated_y = TS_y.copy()
     elif rot == 1:
-        rotated_y[:, 0] = TS_y[:, 3]
-        rotated_y[:, 1] = TS_y[:, 0]
-        rotated_y[:, 2] = TS_y[:, 1]
-        rotated_y[:, 3] = TS_y[:, 2]
-        rotated_y[:, 4] = TS_y[:, 4]
-        rotated_y[:, 5] = TS_y[:, 5]
+        for i, new_i in enumerate(order_90):
+            rotated_y[:, i] = TS_y[:, new_i]
     elif rot == 2:
-        rotated_y[:, 0] = TS_y[:, 2]
-        rotated_y[:, 1] = TS_y[:, 3]
-        rotated_y[:, 2] = TS_y[:, 0]
-        rotated_y[:, 3] = TS_y[:, 1]
-        rotated_y[:, 4] = TS_y[:, 4]
-        rotated_y[:, 5] = TS_y[:, 5]
+        for i, new_i in enumerate(order_180):
+            rotated_y[:, i] = TS_y[:, new_i]
     elif rot == 3:
-        rotated_y[:, 0] = TS_y[:, 1]
-        rotated_y[:, 1] = TS_y[:, 2]
-        rotated_y[:, 2] = TS_y[:, 3]
-        rotated_y[:, 3] = TS_y[:, 0]
-        rotated_y[:, 4] = TS_y[:, 4]
-        rotated_y[:, 5] = TS_y[:, 5]
+        for i, new_i in enumerate(order_270):
+            rotated_y[:, i] = TS_y[:, new_i]
     return rotated_y
 
 
+def rotated_standard_features(rot, TS_X):
+    """
+    rotation as defined in the unit circle (so to the left)
+    mapping from default action sequence:   ["UP", "RIGHT", "DOWN", "LEFT", "WAIT", "BOMB"]
+                                               0      1       2        3       4       5
+    to 90° rotation:                        ["LEFT", "UP", "RIGHT", "DOWN", "WAIT", "BOMB"]
+    to 180° rotation:                       ["DOWN", "LEFT", "UP", "RIGHT", "WAIT", "BOMB"]
+    to 270° rotation:                       ["RIGHT", "DOWN", "LEFT", "UP", "WAIT", "BOMB"]
+    keep waiting and bomb the same
+    """
+    order_orig = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
+    order_90 =   [1, 2, 3, 0, 4, 6, 7, 8, 5, 9, 11, 12, 13, 10, 15, 16, 17, 14, 18, 20, 21, 22, 20, 23, 24]
+    order_180 =  [2, 3, 0, 1, 4, 7, 8, 5, 6, 9, 12, 13, 10, 11, 16, 17, 14, 15, 18, 21, 22, 19, 20, 23, 24]
+    order_270 =  [3, 0, 1, 2, 4, 8, 5, 6, 7, 9, 13, 10, 11, 12, 17, 14, 15, 16, 18, 22, 19, 20, 21, 23, 24]
+
+    rotated_X = np.zeros_like(TS_X)
+    if rot == 0:
+        rotated_X = TS_X.copy()
+    elif rot == 1:
+        for i, new_i in enumerate(order_90):
+            rotated_X[:, i] = TS_X[:, new_i]
+    elif rot == 2:
+        for i, new_i in enumerate(order_180):
+            rotated_X[:, i] = TS_X[:, new_i]
+    elif rot == 3:
+        for i, new_i in enumerate(order_270):
+            rotated_X[:, i] = TS_X[:, new_i]
+    return rotated_X

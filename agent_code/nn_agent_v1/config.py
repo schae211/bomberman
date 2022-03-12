@@ -12,7 +12,7 @@ configs = edict({
     # epsilon-greedy strategy decay parameter: epsilon(t) := epsilon(t-1) * decay^(#episode)
     "EPSILON_DECAY": 0.9998,
     # epsilon-greedy strategy minimum epsilon: epsilon(t) := max(0.05, epsilon(t-1) * decay^(#episode))
-    "EPSILON_MIN": 0.05,
+    "EPSILON_MIN": 0.01,
     # discount factor gamma, which discount future rewards
     "GAMMA": 0.9,
     # N-step temporal difference learning parameter, how many steps to look ahead for computing q-value updates
@@ -66,7 +66,7 @@ reward_specs = edict({
     "COIN_FOUND": 2,
     "COIN_COLLECTED": 5,
     "KILLED_OPPONENT": 25,
-    "KILLED_SELF": -20,
+    "KILLED_SELF": 0,  # setting to 0 because also included in GOT_KILLED
     "GOT_KILLED": -25,
     "OPPONENT_ELIMINATED": 0,
     "SURVIVED_ROUND": 0,

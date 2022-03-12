@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 feature_description = [
-    "awareness_up",
+    "awareness_up",                 # 0
     "awareness_right",
     "awareness_down",
     "awareness_left",

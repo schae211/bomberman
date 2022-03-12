@@ -42,6 +42,10 @@ configs = edict({
     "CONST_A": 0.8,
     # how often to update the target network
     "UPDATE_FREQ": 10,
+    # whether to load a model
+    "LOAD": True,
+    # where to load the model
+    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/11-03-2022-20-51_dnn-v1_1_0.9998_0.05_0.9_10_10000_256_deterministic_channels_huber_0.0001_True_10_model.pt"),
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats")
 })

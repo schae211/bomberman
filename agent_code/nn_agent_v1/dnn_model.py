@@ -7,13 +7,8 @@ from agent_code.nn_agent_v1.config import configs, SAVE_KEY, SAVE_TIME
 
 
 # Hyperparameters
-BATCH_SIZE = configs.BATCH_SIZE
-if configs.LOSS == "huber":
-    LOSS_FUNCTION = nn.HuberLoss()
-elif configs.LOSS == "mse":
-    LOSS_FUNCTION = nn.MSELoss()
-LEARNING_RATE = configs.LEARNING_RATE
-LOAD = False
+if configs.LOSS == "huber": LOSS_FUNCTION = nn.HuberLoss()
+if configs.LOSS == "mse": LOSS_FUNCTION = nn.MSELoss()
 
 
 # Set device
@@ -29,12 +24,12 @@ class DoubleNNModel(nn.Module):
     """
     def __init__(self):
         super(DoubleNNModel, self).__init__()
-        if LOAD:
+        if configs.LOAD:
             print("LOAD MODEL")
-            self.policy_net = torch.load("/Users/philipp/Python_projects/bomberman_rl/agent_code/nn_agent_v1/model.pt",
-                                    map_location=torch.device('cpu'))
-            self.target_net = torch.load("/Users/philipp/Python_projects/bomberman_rl/agent_code/nn_agent_v1/model.pt",
-                                    map_location=torch.device('cpu'))
+            self.policy_net = torch.load(configs.LOAD_PATH,
+                                    map_location=torch.device(device))  # map_location=torch.device("cpu"))
+            self.target_net = torch.load(configs.LOAD_PATH,
+                                    map_location=torch.device(device))  # map_location=torch.device("cpu"))
             self.target_net.load_state_dict(self.policy_net.state_dict())
             self.target_net.eval()
         else:
@@ -42,7 +37,7 @@ class DoubleNNModel(nn.Module):
             self.policy_net = MLP(input_size=25, output_size=6, hidden_size=128)
             self.target_net = MLP(input_size=25, output_size=6, hidden_size=128)
             self.target_net.load_state_dict(self.policy_net.state_dict())
-            self.optimizer = torch.optim.AdamW(self.policy_net.parameters(), lr=LEARNING_RATE)
+            self.optimizer = torch.optim.AdamW(self.policy_net.parameters(), lr=configs.LEARNING_RATE)
         self.policy_net.to(device)
         self.target_net.to(device)
         self.target_net.eval()
@@ -69,7 +64,7 @@ class DoubleNNModel(nn.Module):
 
         """
         dataset = StateValueDataset(states=input_data, values=target)
-        dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
+        dataloader = DataLoader(dataset, batch_size=configs.BATCH_SIZE, shuffle=True)
         size = len(dataset)
         self.policy_net.train()
         for batch, (X, y) in enumerate(dataloader):

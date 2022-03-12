@@ -6,7 +6,7 @@ import pandas as pd
 
 configs = edict({
     # which agent to use: {"MLP", "CNN"}
-    "AGENT": "MLP",
+    "AGENT": "CNN",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 1,
     # epsilon-greedy strategy decay parameter: epsilon(t) := epsilon(t-1) * decay^(#episode)
@@ -20,9 +20,9 @@ configs = edict({
     # storing the last x transition as replay buffer fo r training
     "MEMORY_SIZE": 10_000,
     # how many transitions should be sampled from the memory to train the model
-    "SAMPLE_SIZE": 640,
+    "SAMPLE_SIZE": 320,
     # should we exploit symmetries to augment the training data
-    "TS_AUGMENTATION": False,
+    "TS_AUGMENTATION": True,
     # what batch size should be used to train the model
     "BATCH_SIZE": 32,  # 1024,  # 128
     # policy: {"deterministic", "stochastic"}
@@ -30,7 +30,7 @@ configs = edict({
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "minimal"}
-    "FEATURE_ENGINEERING": "standard",
+    "FEATURE_ENGINEERING": "channels",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn

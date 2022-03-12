@@ -188,6 +188,9 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         # append the predictors x=state, and response y=q_values
         X[i], y[i] = state, q_values
 
+    if configs.TS_AUGMENTATION:
+        X, y = get_augmented_TS(configs.FEATURE_ENGINEERING, X, y)
+
     # reshape our predictors and checking the shape
     self.logger.debug(f"Shape x: {X.shape}, Shape y: {y.shape}")
     self.model.fit(input_data=X, target=y)
@@ -322,5 +325,59 @@ def get_priority(self):
     priorities = (temporal_differences**configs.CONST_A)/(temporal_differences**configs.CONST_A).sum()
     return priorities
 
+
+def get_augmented_TS(FEAT_ENG, TS_X, TS_y):
+    Augmented_X = np.zeros([TS_X.shape[0]*4] + feature_specs[configs.FEATURE_ENGINEERING].shape)
+    Augmented_y = np.zeros((TS_X.shape[0]*4, 6))
+    if FEAT_ENG == "channels":
+        for num_rot in range(4):
+            Augmented_X[num_rot*TS_X.shape[0]:(num_rot+1)*TS_X.shape[0],:] = \
+                np.rot90(TS_X, num_rot, axes=(2, 3))
+            Augmented_y[num_rot*TS_X.shape[0]:(num_rot+1)*TS_X.shape[0],:] = \
+                rotated_actions(num_rot, TS_y)
+        return Augmented_X, Augmented_y
+
+    elif FEAT_ENG == "standard":
+        raise NotImplementedError
+
+
+def rotated_actions(rot, TS_y):
+    """
+    rotation as defined in the unit circle (so to the left)
+    mapping from default action sequence:   ["UP", "RIGHT", "DOWN", "LEFT", "WAIT", "BOMB"]
+                                               0      1       2        3       4       5
+    to 90° rotation:                        ["LEFT", "UP", "RIGHT", "DOWN", "WAIT", "BOMB"]
+    to 180° rotation:                       ["DOWN", "LEFT", "UP", "RIGHT", "WAIT", "BOMB"]
+    to 270° rotation:                       ["RIGHT", "DOWN", "LEFT", "UP", "WAIT", "BOMB"]
+    keep waiting and bomb the same
+    :param rot: integer {0,1,2,3}
+    :param q_values: np.array with shape = (#actions,)
+    :return: q_values: np.array with shape = (#actions,) adjusted according to the rotation
+    """
+    rotated_y = np.zeros_like(TS_y)
+    if rot == 0:
+        rotated_y = TS_y
+    elif rot == 1:
+        rotated_y[:, 0] = TS_y[:, 3]
+        rotated_y[:, 1] = TS_y[:, 0]
+        rotated_y[:, 2] = TS_y[:, 1]
+        rotated_y[:, 3] = TS_y[:, 2]
+        rotated_y[:, 4] = TS_y[:, 4]
+        rotated_y[:, 5] = TS_y[:, 5]
+    elif rot == 2:
+        rotated_y[:, 0] = TS_y[:, 2]
+        rotated_y[:, 1] = TS_y[:, 3]
+        rotated_y[:, 2] = TS_y[:, 0]
+        rotated_y[:, 3] = TS_y[:, 1]
+        rotated_y[:, 4] = TS_y[:, 4]
+        rotated_y[:, 5] = TS_y[:, 5]
+    elif rot == 3:
+        rotated_y[:, 0] = TS_y[:, 1]
+        rotated_y[:, 1] = TS_y[:, 2]
+        rotated_y[:, 2] = TS_y[:, 3]
+        rotated_y[:, 3] = TS_y[:, 0]
+        rotated_y[:, 4] = TS_y[:, 4]
+        rotated_y[:, 5] = TS_y[:, 5]
+    return rotated_y
 
 

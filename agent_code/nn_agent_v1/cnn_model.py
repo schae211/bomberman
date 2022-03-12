@@ -11,7 +11,7 @@ BATCH_SIZE = configs.BATCH_SIZE
 if configs.LOSS == "huber": LOSS_FUNCTION = nn.HuberLoss()
 if configs.LOSS == "mse": LOSS_FUNCTION = nn.MSELoss()
 LEARNING_RATE = configs.LEARNING_RATE
-LOAD = False
+LOAD = True
 
 
 # Set device

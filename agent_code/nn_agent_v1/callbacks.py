@@ -53,7 +53,7 @@ def act(self, game_state: dict) -> str:
         return action
     else:
         self.logger.debug("Querying fitted model for action.")
-        features = state_to_features(game_state)  #.reshape(1, -1)  # .reshape(1, -1) needed if single sample for MultiOutputRegressor
+        features = state_to_features(game_state)
         q_values = self.model.predict_policy(features).reshape(-1)  # computing q-values using our fitted model
 
         if configs.POLICY == "deterministic":
@@ -84,13 +84,12 @@ def state_to_features(game_state: dict) -> np.array:
     if game_state is None:
         return None
 
-    # TODO: What shape is required as input for CNN?
     if configs.FEATURE_ENGINEERING == "channels":
+
         object_map = game_state["field"]
 
         coin_map = np.zeros_like(game_state["field"])
-        for cx, cy in game_state["coins"]:
-            coin_map[cx, cy] = 1
+        for cx, cy in game_state["coins"]: coin_map[cx, cy] = 1
 
         self_map = np.zeros_like(game_state["field"])
         self_map[game_state["self"][3]] = 1
@@ -145,9 +144,6 @@ def state_to_features(game_state: dict) -> np.array:
                                    coin_direction,
                                    crate_direction,
                                    bomb_info])
-
-        if game_state["explosion_map"].sum() > 0:
-            break_here = 0
 
         return features[None,:]
 

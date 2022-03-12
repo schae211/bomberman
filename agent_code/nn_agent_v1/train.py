@@ -6,7 +6,7 @@ import pandas as pd
 
 import events as e
 from agent_code.nn_agent_v1.callbacks import state_to_features, coin_bfs, save_bfs, get_bomb_map
-from agent_code.nn_agent_v1.config import configs, feature_specs, reward_specs, SAVE_KEY, SAVE_TIME
+from agent_code.nn_agent_v1.config import configs, feature_specs, reward_specs, auxiliary_rewards, SAVE_KEY, SAVE_TIME
 
 Transition = namedtuple("Transition", ("round", "state", "action", "next_state", "reward"))
 
@@ -28,7 +28,7 @@ AUGMENT = configs.TS_AUGMENTATION
 
 
 # Saving training statistics
-SAVE_EVERY = 5000  #
+SAVE_EVERY = 100  #
 INCLUDE_EVERY = 4  # only include every x episode in the saved stats
 SAVE_DIR = configs.MODEL_LOC
 step_information = {"round": [], "step": [], "events": [], "reward": []}
@@ -111,11 +111,6 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
     This is similar to game_events_occurred. self.events will contain all events that
     occurred during your agent's final step.
-
-    This is *one* of the places where you could update your agent.
-    This is also a good place to store an agent that you updated.
-
-    :param self: The same object that is passed to all of your callbacks.
     """
     # info that episode is over
     self.logger.debug(f'Encountered event(s) {", ".join(map(repr, events))} in final step')
@@ -160,75 +155,48 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
     # extract information from each transition tuple (as stored above)
     for i, index in enumerate(batch):
-
-        # get episode
-        episode = self.memory[index].round
-        state = self.memory[index].state
-
+        # get round and episode
+        episode, state= self.memory[index].round, self.memory[index].state
         # translate action to int
         action = ACTION_TRANSLATE[self.memory[index].action]
-
         # check whether state is none, which corresponds to the first state
         if self.memory[i].state is None:
             continue
 
         # get the reward of the N next steps, check that loop does not extend over length of memory
-        rewards = []
         loop_until = min(index + N, len(self.memory))  # prevent index out of range error
-        for t in range(index, loop_until):
-            # check whether we are still in the same episode
-            if self.memory[t].round == episode:
-                rewards.append(self.memory[t].reward)
-
-        gammas = [GAMMA ** t for t in range(0, len(rewards))]
-
-        # now multiply elementwise discounted gammas by the rewards and get the sum
-
-        n_steps_reward = (np.array(rewards) * np.array(gammas)).sum()
+        rewards = np.array([self.memory[t].reward * (GAMMA **t) for t in range(index, loop_until)
+                            if self.memory[t].round == episode])
+        n_steps_reward = rewards.sum()
 
         # standard case: non-terminal state and model is fit
         if self.memory[len(rewards) - 1].next_state is not None:
-            #q_update = n_steps_reward + GAMMA ** N * \
-            #           np.amax(self.model.predict_target(self.memory[len(rewards) - 1].next_state.reshape(1, -1)))
             q_update = n_steps_reward + GAMMA ** N * \
                        np.amax(self.model.predict_target(self.memory[len(rewards) - 1].next_state))
-            # use the model to predict all the other q_values
-            # (below we replace the q_value for the selected action with this q_update)
-
-            #q_values = self.model.predict_policy(state.reshape(1, -1)).reshape(-1)
+            # use the model to predict all the other q_values (below we replace the q_value for the selected action with this q_update)
             q_values = self.model.predict_policy(state).reshape(-1)
+
         # if we have a terminal state in the next states we cannot predict q-values for the terminal state
         else:
             q_update = n_steps_reward
-            # use the model to predict all the other q_values
-            # (below we replace the q_value for the selected action with this q_update)
-
-            #q_values = self.model.predict_policy(state.reshape(1, -1)).reshape(-1)
+            # use the model to predict all the other q_values (below we replace the q_value for the selected action with this q_update)
             q_values = self.model.predict_policy(state).reshape(-1)
 
         # for the action that we actually took update the q-value according to above
         q_values[action] = q_update
 
         # append the predictors x=state, and response y=q_values
-        X[i] = state
-        y[i] = q_values
-
+        X[i], y[i] = state, q_values
 
     # reshape our predictors and checking the shape
-    self.logger.debug(f"Shape x: {X.shape}")
-    self.logger.debug(f"Shape y: {y.shape}")
+    self.logger.debug(f"Shape x: {X.shape}, Shape y: {y.shape}")
     self.model.fit(input_data=X, target=y)
 
     global episode_information
     if last_game_state:
         episode_information["round"].append(last_game_state["round"])
-        TS_MSE = ((self.model.predict_policy(X) - y) ** 2).mean(axis=0)
-        episode_information["TS_MSE_1"].append(TS_MSE[0])
-        episode_information["TS_MSE_2"].append(TS_MSE[1])
-        episode_information["TS_MSE_3"].append(TS_MSE[2])
-        episode_information["TS_MSE_4"].append(TS_MSE[3])
-        episode_information["TS_MSE_5"].append(TS_MSE[4])
-        episode_information["TS_MSE_6"].append(TS_MSE[5])
+        TS_MSE = ((self.model.predict_policy(X) - y) ** 2).mean(axis=0)  # compute TS error
+        for i in range(6): episode_information[f"TS_MSE_{i+1}"].append(TS_MSE[i])
 
     if last_game_state["round"] % SAVE_EVERY == 0:
         pd.DataFrame(episode_information).to_csv(f"{SAVE_DIR}/{SAVE_TIME}_{SAVE_KEY}_episode_stats.csv", index=False)
@@ -243,38 +211,38 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
     # for the first step nothing is returned, but I need the step argument to discount the coin reward
     step = 0 if old_game_state is None else old_game_state["step"]
 
-    # add reward/penalty based on whether the agent moved towards/away from the nearest coin (if coins were visible)
-    if old_game_state and new_game_state and old_game_state["coins"] != []:
-        coin_info = coin_bfs(old_game_state["field"], old_game_state["coins"], old_game_state["self"][3])
-        if coin_info is not None:  # check whether we can even reach any revealed coin
-            closest_coin = coin_info[1][-1]
-            next_move = coin_info[1][0]
-            if new_game_state["self"][3] == next_move:  # moved towards coin
-                events.append(e.MOVE_TO_COIN)
-            elif old_game_state["self"][3] == new_game_state["self"][3]:  # not moved
-                pass
-            else:  # moved away from coin
-                events.append(e.MOVE_FROM_COIN)
-
-    # reward/penalize if escaping/running into bomb
-    if old_game_state and new_game_state and old_game_state["bombs"] != []:
-        explosion_map = get_bomb_map(old_game_state["field"], old_game_state["bombs"], old_game_state["explosion_map"])
-        # check if old position is in danger zone in explosion map
-        explosion_info = save_bfs(object_position=old_game_state["field"], explosion_map=explosion_map,
-                                  self_position=old_game_state["self"][3])
-        if explosion_info != ([], []):  # if the old position is not safe
-            closest_save_spot = explosion_info[1][-1]
-            next_move = explosion_info[1][0]
-            if new_game_state["self"][3] == next_move:  # if we did make the move suggested by bfs
-                events.append(e.ESCAPE_FROM_BOMB)
-            else:
-                events.append(e.STAY_IN_BOMB)
-
-    # check whether agent stayed in the same spot for too long (3 out of 5)
-    if new_game_state:
-        check_same_pos = np.array([state == new_game_state["self"][3] for state in self.last_states]).sum()
-        if check_same_pos >= 3:
-            events.append(e.MOVE_IN_CIRCLES)
+    # define which auxiliary rewards should be considered:
+    if auxiliary_rewards.MOVE_TO_OR_FROM_COIN:
+        # add reward/penalty based on whether the agent moved towards/away from the nearest coin (if coins were visible)
+        if old_game_state and new_game_state and old_game_state["coins"] != []:
+            coin_info = coin_bfs(old_game_state["field"], old_game_state["coins"], old_game_state["self"][3])
+            if coin_info is not None:  # check whether we can even reach any revealed coin
+                next_move = coin_info[1][0]
+                if new_game_state["self"][3] == next_move:  # moved towards coin
+                    events.append(e.MOVE_TO_COIN)
+                elif old_game_state["self"][3] == new_game_state["self"][3]:  # not moved
+                    pass
+                else:  # moved away from coin
+                    events.append(e.MOVE_FROM_COIN)
+    elif auxiliary_rewards.STAY_OR_ESCAPE_BOMB:
+        # reward/penalize if escaping/running into bomb
+        if old_game_state and new_game_state and old_game_state["bombs"] != []:
+            explosion_map = get_bomb_map(old_game_state["field"], old_game_state["bombs"], old_game_state["explosion_map"])
+            # check if old position is in danger zone in explosion map
+            explosion_info = save_bfs(object_position=old_game_state["field"], explosion_map=explosion_map,
+                                      self_position=old_game_state["self"][3])
+            if explosion_info != ([], []):  # if the old position is not safe
+                next_move = explosion_info[1][0]
+                if new_game_state["self"][3] == next_move:  # if we did make the move suggested by bfs
+                    events.append(e.ESCAPE_FROM_BOMB)
+                else:
+                    events.append(e.STAY_IN_BOMB)
+    elif auxiliary_rewards.MOVE_IN_CIRCLES:
+        # check whether agent stayed in the same spot for too long (3 out of 5)
+        if new_game_state:
+            check_same_pos = np.array([state == new_game_state["self"][3] for state in self.last_states]).sum()
+            if check_same_pos >= 3:
+                events.append(e.MOVE_IN_CIRCLES)
 
     game_rewards = {
         # original events
@@ -298,6 +266,8 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
         e.MOVE_TO_COIN: reward_specs.MOVE_TO_COIN,
         e.MOVE_FROM_COIN: reward_specs.MOVE_FROM_COIN,
         e.MOVE_IN_CIRCLES: reward_specs.MOVE_IN_CIRCLES,
+        e.STAY_IN_BOMB: reward_specs.STAY_IN_BOMB,
+        e.ESCAPE_FROM_BOMB: reward_specs.ESCAPE_FROM_BOMB
     }
 
     reward_sum = np.array([game_rewards[event] for event in events if event in game_rewards]).sum()
@@ -327,23 +297,13 @@ def get_priority(self):
             temporal_differences[i] = 0
 
         # get the reward of the N next steps, check that loop does not extend over length of memory
-        rewards = []
-        loop_until = min(i + N, len(memory))  # prevent index out of range error
-        for t in range(i, loop_until):
-            # check whether we are still in the same episode
-            if memory[t].round == episode:
-                rewards.append(memory[t].reward)
-
-        gammas = [GAMMA ** t for t in range(0, len(rewards))]
-
-        # now multiply elementwise discounted gammas by the rewards and get the sum
-        n_steps_reward = (np.array(rewards) * np.array(gammas)).sum()
+        loop_until = min(i + N, len(self.memory))  # prevent index out of range error
+        rewards = np.array([self.memory[t].reward * (GAMMA **t) for t in range(i, loop_until)
+                            if self.memory[t].round == episode])
+        n_steps_reward = rewards.sum()
 
         # standard case: non-terminal state and model is fit
         if self.memory[len(rewards) - 1].next_state is not None:
-            #q_update = n_steps_reward + GAMMA ** N * \
-            #           np.amax(self.model.predict_target(self.memory[len(rewards) - 1].next_state.reshape(1, -1)))
-            #q_values = self.model.predict_policy(state.reshape(1, -1)).reshape(-1)
             q_update = n_steps_reward + GAMMA ** N * \
                        np.amax(self.model.predict_target(self.memory[len(rewards) - 1].next_state))
             q_values = self.model.predict_policy(state).reshape(-1)
@@ -351,7 +311,6 @@ def get_priority(self):
         # if we have a terminal state in the next states we cannot predict q-values for the terminal state
         else:
             q_update = n_steps_reward
-            #q_values = self.model.predict_policy(state.reshape(1, -1)).reshape(-1)
             q_values = self.model.predict_policy(state).reshape(-1)
 
         temporal_differences[i] = np.abs(q_update - q_values[action])

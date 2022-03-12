@@ -2,10 +2,11 @@
 from datetime import datetime
 from easydict import EasyDict as edict
 import os
+import pandas as pd
 
 configs = edict({
     # which agent to use: {"MLP", "CNN"}
-    "AGENT": "CNN",
+    "AGENT": "MLP",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 1,
     # epsilon-greedy strategy decay parameter: epsilon(t) := epsilon(t-1) * decay^(#episode)
@@ -29,7 +30,7 @@ configs = edict({
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "minimal"}
-    "FEATURE_ENGINEERING": "channels",
+    "FEATURE_ENGINEERING": "standard",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
@@ -45,13 +46,10 @@ configs = edict({
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats")
 })
 
-feature_specs = edict({
-    "channels": edict({
-        "shape": [4, 17, 17]
-    }),
-    "standard": edict({
-        "shape": [25]
-    })
+auxiliary_rewards = edict({
+    "MOVE_IN_CIRCLES": False,
+    "MOVE_TO_OR_FROM_COIN": False,
+    "STAY_OR_ESCAPE_BOMB": False
 })
 
 reward_specs = edict({
@@ -73,14 +71,31 @@ reward_specs = edict({
     "OPPONENT_ELIMINATED": 0,
     "SURVIVED_ROUND": 0,
     # auxiliary events to reward shaping
-    "MOVE_TO_COIN": 1,
-    "MOVE_FROM_COIN": -1,
-    "MOVE_IN_CIRCLES": -1,
+    "MOVE_TO_COIN": 0,
+    "MOVE_FROM_COIN": 0,
+    "MOVE_IN_CIRCLES": 0,
+    "STAY_IN_BOMB": 0,
+    "ESCAPE_FROM_BOMB": 0
 })
+
+# needed for generating the right shapes
+feature_specs = edict({
+    "channels": edict({
+        "shape": [4, 17, 17]
+    }),
+    "standard": edict({
+        "shape": [25]
+    })
+})
+
 
 SAVE_KEY = f'{configs["AGENT"]}_{configs["EPSILON"]}_{configs["EPSILON_DECAY"]}_{configs["EPSILON_MIN"]}_{configs["GAMMA"]}_{configs["N_STEPS"]}_{configs["MEMORY_SIZE"]}_{configs["BATCH_SIZE"]}_{configs["POLICY"]}_{configs["FEATURE_ENGINEERING"]}_{configs["LOSS"]}_{configs["LEARNING_RATE"]}_{configs["PRIORITIZED_REPLAY"]}_{configs["UPDATE_FREQ"]}'
 SAVE_TIME = datetime.now().strftime("%d-%m-%Y-%H-%M")
 
-# TODO:
-#  Include reward information in the config files, we have to gather all tunable parameters in one file, this way
-#  we can ensure that we keep track of the things we already tested in the past.
+# SAVE all configs as dataframe with the same SAVE_KEY
+save_dict = {}
+save_dict.update(configs)
+save_dict.update(auxiliary_rewards)
+save_dict.update(reward_specs)
+save_dict["DEFAULT_PROBS"] = str(save_dict["DEFAULT_PROBS"])
+pd.DataFrame(save_dict, index=[1]).to_csv(f"{configs.MODEL_LOC}/{SAVE_TIME}_{SAVE_KEY}_configs.csv", index=False)

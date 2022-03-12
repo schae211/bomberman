@@ -1,61 +1,39 @@
 from collections import namedtuple, deque
 
 import numpy as np
-import pickle
 from typing import List
 import pandas as pd
-import random
-from datetime import datetime
 
 import events as e
-from agent_code.nn_agent_v1.callbacks import state_to_features
-from agent_code.nn_agent_v1.callbacks import coin_bfs, save_bfs
-from agent_code.nn_agent_v1.callbacks import get_bomb_map
-from agent_code.nn_agent_v1.config import configs
-from agent_code.nn_agent_v1.config import SAVE_KEY, SAVE_TIME
+from agent_code.nn_agent_v1.callbacks import state_to_features, coin_bfs, save_bfs, get_bomb_map
+from agent_code.nn_agent_v1.config import configs, feature_specs, reward_specs, SAVE_KEY, SAVE_TIME
 
+Transition = namedtuple("Transition", ("round", "state", "action", "next_state", "reward"))
 
-# a way to structure our code?
-Transition = namedtuple("Transition",
-                        ("round", "state", "action", "next_state", "reward"))
-
-# helper lists and dictionaries for actions
+# helper lists and dictionaries for actions (e.g. to translate between index and action string)
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 ACTION_TRANSLATE = {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3, "WAIT": 4, "BOMB": 5}
 ACTION_TRANSLATE_REV = {val: key for key, val in ACTION_TRANSLATE.items()}
 
 
-# Hyper parameters
-GAMMA = configs["GAMMA"]
-EPSILON = configs["EPSILON"]
-EPSILON_REDUCTION = configs["EPSILON_DECAY"]
-MIN_EPSILON = configs["EPSILON_MIN"]
-N = configs["N_STEPS"]
-MEMORY_SIZE = configs["MEMORY_SIZE"]
-BATCH_SIZE = configs["BATCH_SIZE"]
+# Hyper parameters -> simply import from config dict?
+GAMMA = configs.GAMMA
+EPSILON = configs.EPSILON
+EPSILON_REDUCTION = configs.EPSILON_DECAY
+MIN_EPSILON = configs.EPSILON_MIN
+N = configs.N_STEPS
+MEMORY_SIZE = configs.MEMORY_SIZE
+SAMPLE_SIZE = configs.SAMPLE_SIZE
+AUGMENT = configs.TS_AUGMENTATION
 
-# should training data be augmented? {True, False}
-# keep in mind that it only works for proper channels at the moment.
-AUGMENT = False
 
-# Needed for augmenting training data
-GAME_SIZE = 17
-
-# specify argument whether training statistics should be saved
-SAVE_TRAIN = True
-SAVE_EVERY = 200
-INCLUDE_EVERY = 4 # only include every x episode in the saved stats
-SAVE_DIR = configs["MODEL_LOC"]
-if SAVE_TRAIN:
-    step_information = {"round": [], "step": [], "events": [], "reward": []}
-    episode_information = {"round": [], "TS_MSE_1": [], "TS_MSE_2": [], "TS_MSE_3": [],
-                           "TS_MSE_4": [], "TS_MSE_5": [], "TS_MSE_6": []}
-
-# global variable to store the last states used to shape rewards
-LAST_STATES = 5
-
-#
-PRIORITIZED_REPLAY = configs.PRIORITIZED_REPLAY
+# Saving training statistics
+SAVE_EVERY = 5000  #
+INCLUDE_EVERY = 4  # only include every x episode in the saved stats
+SAVE_DIR = configs.MODEL_LOC
+step_information = {"round": [], "step": [], "events": [], "reward": []}
+episode_information = {"round": [], "TS_MSE_1": [], "TS_MSE_2": [], "TS_MSE_3": [],
+                       "TS_MSE_4": [], "TS_MSE_5": [], "TS_MSE_6": []}
 
 
 def setup_training(self):
@@ -68,7 +46,7 @@ def setup_training(self):
     """
     # Set up an array that will keep track of transition tuples (s, a, r, s')
     self.memory = deque(maxlen=MEMORY_SIZE)
-    self.last_states = deque(maxlen=LAST_STATES)
+    self.last_states = deque(maxlen=5)  # used for reward shaping
 
     # adding epsilon var to agent
     self.epsilon = EPSILON
@@ -101,11 +79,11 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
     # fill our memory after each step, state_to_features is defined in callbacks.py and imported above
     if old_game_state:
         rewards = reward_from_events(self, events, old_game_state, new_game_state)
-        self.memory.append(Transition(old_game_state["round"],
-                                      state_to_features(old_game_state),  # state
-                                      self_action,  # action
-                                      state_to_features(new_game_state),  # next_state
-                                      rewards))  # reward
+        self.memory.append(Transition(old_game_state["round"],              # round
+                                      state_to_features(old_game_state),    # state
+                                      self_action,                          # action
+                                      state_to_features(new_game_state),    # next_state
+                                      rewards))                             # reward
 
 
         # use global step information variable
@@ -155,34 +133,40 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         step_information["events"].append("| ".join(map(repr, events)))
         step_information["reward"].append(reward_from_events(self, events, last_game_state, None))
 
-    if last_game_state["round"] % SAVE_EVERY == 0:
+    if last_game_state["round"] % SAVE_EVERY == 0:  # save the TS stats about every x rounds.
         pd.DataFrame(step_information).to_csv(f"{SAVE_DIR}/{SAVE_TIME}_{SAVE_KEY}_game_stats.csv", index=False)
 
     # updating the target network
     if last_game_state["round"] % configs.UPDATE_FREQ == 0:
         self.model.update_target()
 
-    # initialize our x and y which we use for fitting later on
-    x, y = [], []
 
-    # TODO: Check if implementation for Prioritized Replay is correct
-    if len(self.memory) > BATCH_SIZE:
+    if len(self.memory) > SAMPLE_SIZE:  # replay memory is sufficiently filled
+        X = np.zeros([SAMPLE_SIZE] + feature_specs[configs.FEATURE_ENGINEERING].shape)
+        y = np.zeros((SAMPLE_SIZE, 6))
+
         # Prioritized Replay: Before building our training dataset, we need to compute the temporal difference error
         # for transitions currently stored in the memory (aka replay buffer).
-        priorities = get_priority(self)
-        batch = np.random.choice(a=np.arange(0, len(self.memory)), size=BATCH_SIZE, replace=False, p=priorities)
+        if configs.PRIORITIZED_REPLAY:
+            priorities = get_priority(self)
+            batch = np.random.choice(a=np.arange(0, len(self.memory)), size=SAMPLE_SIZE, replace=False, p=priorities)
+        else:
+            batch = np.random.choice(a=np.arange(0, len(self.memory)), size=SAMPLE_SIZE, replace=False)
     else:
+        X = np.zeros([len(self.memory)] + feature_specs[configs.FEATURE_ENGINEERING].shape)
+        y = np.zeros((len(self.memory), 6))
+
         batch = range(len(self.memory))
 
     # extract information from each transition tuple (as stored above)
-    for i in batch:
+    for i, index in enumerate(batch):
 
         # get episode
-        episode = self.memory[i].round
-        state = self.memory[i].state
+        episode = self.memory[index].round
+        state = self.memory[index].state
 
         # translate action to int
-        action = ACTION_TRANSLATE[self.memory[i].action]
+        action = ACTION_TRANSLATE[self.memory[index].action]
 
         # check whether state is none, which corresponds to the first state
         if self.memory[i].state is None:
@@ -190,8 +174,8 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
         # get the reward of the N next steps, check that loop does not extend over length of memory
         rewards = []
-        loop_until = min(i + N, len(self.memory))  # prevent index out of range error
-        for t in range(i, loop_until):
+        loop_until = min(index + N, len(self.memory))  # prevent index out of range error
+        for t in range(index, loop_until):
             # check whether we are still in the same episode
             if self.memory[t].round == episode:
                 rewards.append(self.memory[t].reward)
@@ -226,24 +210,19 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         q_values[action] = q_update
 
         # append the predictors x=state, and response y=q_values
-        x.append(state)
-        y.append(q_values)
+        X[i] = state
+        y[i] = q_values
 
-    # importantly partial fitting is not possible with most methods except for NN (so we fit again to the whole TS)
-    self.logger.debug(f"Fitting the model using the input as specified below:")
 
     # reshape our predictors and checking the shape
-    # FIXME: Only working for Conv!
-    x_reshaped = np.stack(x, axis=0)[:,0,:,:,:]
-    y_reshaped = np.stack(y, axis=0)
-    self.logger.debug(f"Shape x_reshape: {x_reshaped.shape}")
-    self.logger.debug(f"Shape y_reshape: {y_reshaped.shape}")
-    self.model.fit(X=x_reshaped, y=y_reshaped)
+    self.logger.debug(f"Shape x: {X.shape}")
+    self.logger.debug(f"Shape y: {y.shape}")
+    self.model.fit(input_data=X, target=y)
 
     global episode_information
     if last_game_state:
         episode_information["round"].append(last_game_state["round"])
-        TS_MSE = ((self.model.predict_policy(x_reshaped) - y_reshaped) ** 2).mean(axis=0)
+        TS_MSE = ((self.model.predict_policy(X) - y) ** 2).mean(axis=0)
         episode_information["TS_MSE_1"].append(TS_MSE[0])
         episode_information["TS_MSE_2"].append(TS_MSE[1])
         episode_information["TS_MSE_3"].append(TS_MSE[2])
@@ -262,10 +241,7 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
     """
 
     # for the first step nothing is returned, but I need the step argument to discount the coin reward
-    if old_game_state is None:
-        step = 0
-    else:
-        step = old_game_state["step"]
+    step = 0 if old_game_state is None else old_game_state["step"]
 
     # add reward/penalty based on whether the agent moved towards/away from the nearest coin (if coins were visible)
     if old_game_state and new_game_state and old_game_state["coins"] != []:
@@ -301,22 +277,32 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
             events.append(e.MOVE_IN_CIRCLES)
 
     game_rewards = {
-        e.COIN_COLLECTED: 5,
-        e.KILLED_SELF: -20,
-        e.INVALID_ACTION: -2,
-        e.WAITED: -0.5,
-        e.MOVE_TO_COIN: 1,
-        e.MOVE_FROM_COIN: -1,
-        e.MOVE_IN_CIRCLES: -1,
-        e.CRATE_DESTROYED: 2,
-        e.COIN_FOUND: 2,
+        # original events
+        e.MOVED_RIGHT: reward_specs.MOVED_RIGHT,
+        e.MOVED_UP: reward_specs.MOVED_UP,
+        e.MOVED_DOWN: reward_specs.MOVED_DOWN,
+        e.MOVED_LEFT: reward_specs.MOVED_LEFT,
+        e.WAITED: reward_specs.WAITED,
+        e.INVALID_ACTION: reward_specs.INVALID_ACTION,
+        e.BOMB_DROPPED: reward_specs.BOMB_DROPPED,
+        e.BOMB_EXPLODED: reward_specs.BOMB_EXPLODED,
+        e.CRATE_DESTROYED: reward_specs.CRATE_DESTROYED,
+        e.COIN_FOUND: reward_specs.COIN_FOUND,
+        e.COIN_COLLECTED: reward_specs.COIN_COLLECTED,
+        e.KILLED_OPPONENT: reward_specs.KILLED_OPPONENT,
+        e.KILLED_SELF: reward_specs.KILLED_SELF,
+        e.GOT_KILLED: reward_specs.GOT_KILLED,
+        e.OPPONENT_ELIMINATED: reward_specs.OPPONENT_ELIMINATED,
+        e.SURVIVED_ROUND: reward_specs.SURVIVED_ROUND,
+        # auxiliary events and rewards:
+        e.MOVE_TO_COIN: reward_specs.MOVE_TO_COIN,
+        e.MOVE_FROM_COIN: reward_specs.MOVE_FROM_COIN,
+        e.MOVE_IN_CIRCLES: reward_specs.MOVE_IN_CIRCLES,
     }
-    reward_sum = 0
-    for event in events:
-        if event in game_rewards:
-            reward_sum += game_rewards[event]
 
+    reward_sum = np.array([game_rewards[event] for event in events if event in game_rewards]).sum()
     self.logger.info(f"Awarded {reward_sum} for events {', '.join(events)}")
+
     return reward_sum
 
 
@@ -370,14 +356,12 @@ def get_priority(self):
 
         temporal_differences[i] = np.abs(q_update - q_values[action])
 
-        # adding constant to ensure that no experience has 0 probability to be taken
-        const_e = 1  # TODO: How to choose e here?
-        temporal_differences += const_e
+    # adding constant to ensure that no experience has 0 probability to be taken
+    temporal_differences += configs.CONST_E
 
-        # computing the priority values
-        const_a = 0.8  # TODO: How to choose e here?
-        priorities = (temporal_differences**const_a)/(temporal_differences**const_a).sum()
-        return priorities
+    # computing the priority values
+    priorities = (temporal_differences**configs.CONST_A)/(temporal_differences**configs.CONST_A).sum()
+    return priorities
 
 
 

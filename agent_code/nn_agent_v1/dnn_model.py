@@ -13,7 +13,7 @@ if configs.LOSS == "huber":
 elif configs.LOSS == "mse":
     LOSS_FUNCTION = nn.MSELoss()
 LEARNING_RATE = configs.LEARNING_RATE
-LOAD = True
+LOAD = False
 
 
 # Set device
@@ -58,17 +58,17 @@ class DoubleNNModel(nn.Module):
         self.target_net.eval()
         return self.target_net(torch.Tensor(state).to(device)).detach().cpu().numpy()
 
-    def fit(self, X: np.ndarray, y: np.ndarray) -> float:
+    def fit(self, input_data: np.ndarray, target: np.ndarray) -> float:
         """
         Trains the model on a batch of data
         Args:
-            X: stack states as numpy array [size, input_size]
-            y: stack Q-Values as numPy array [size, num_actions]
+            input_data: stack states as numpy array [size, input_size]
+            target: stack Q-Values as numPy array [size, num_actions]
 
         Returns:
 
         """
-        dataset = StateValueDataset(states=X, values=y)
+        dataset = StateValueDataset(states=input_data, values=target)
         dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
         size = len(dataset)
         self.policy_net.train()

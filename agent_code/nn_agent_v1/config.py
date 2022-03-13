@@ -20,9 +20,9 @@ configs = edict({
     # storing the last x transition as replay buffer fo r training
     "MEMORY_SIZE": 10_000,
     # how many transitions should be sampled from the memory to train the model
-    "SAMPLE_SIZE": 128,
+    "SAMPLE_SIZE": 1024,
     # should we exploit symmetries to augment the training data
-    "TS_AUGMENTATION": True,
+    "TS_AUGMENTATION": False,
     # what batch size should be used to train the model
     "BATCH_SIZE": 32,  # 1024,  # 128
     # policy: {"deterministic", "stochastic"}
@@ -45,7 +45,7 @@ configs = edict({
     # whether to load a model
     "LOAD": False,
     # where to load the model
-    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/11-03-2022-20-51_dnn-v1_1_0.9998_0.05_0.9_10_10000_256_deterministic_channels_huber_0.0001_True_10_model.pt"),
+    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/NA"),
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats")
 })
@@ -62,7 +62,7 @@ reward_specs = edict({
     "MOVED_UP": 0,
     "MOVED_DOWN": 0,
     "MOVED_LEFT": 0,
-    "WAITED": -0.5,
+    "WAITED": 0,
     "INVALID_ACTION": -2,
     "BOMB_DROPPED": 0,
     "BOMB_EXPLODED": 0,

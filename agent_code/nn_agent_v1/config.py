@@ -41,7 +41,7 @@ configs = edict({
     "CONST_E": 1,
     "CONST_A": 0.8,
     # how often to update the target network
-    "UPDATE_FREQ": 10,
+    "UPDATE_FREQ": 100,
     # whether to load a model
     "LOAD": False,
     # where to load the model

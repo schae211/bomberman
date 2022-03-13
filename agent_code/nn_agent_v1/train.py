@@ -136,53 +136,16 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     if last_game_state["round"] % configs.UPDATE_FREQ == 0:
         self.model.update_target()
 
+    priorities, states, updated_Qs = compute_priority(self)
 
-    if len(self.memory) > SAMPLE_SIZE:  # replay memory is sufficiently filled
-        X = np.zeros([SAMPLE_SIZE] + feature_specs[configs.FEATURE_ENGINEERING].shape)
-        y = np.zeros((SAMPLE_SIZE, 6))
-
-        # Prioritized Replay: Before building our training dataset, we need to compute the temporal difference error
-        # for transitions currently stored in the memory (aka replay buffer).
-        if configs.PRIORITIZED_REPLAY:
-            #priorities = get_priority(self)
-            priorities = compute_priority(self)
-            batch = np.random.choice(a=np.arange(0, len(self.memory)), size=SAMPLE_SIZE, replace=False, p=priorities)
-        else:
-            batch = np.random.choice(a=np.arange(0, len(self.memory)), size=SAMPLE_SIZE, replace=False)
+    if configs.PRIORITIZED_REPLAY:
+        batch = np.random.choice(a=np.arange(0, len(self.memory)), size=min(SAMPLE_SIZE, len(self.memory)),
+                                 replace=False, p=priorities)
     else:
-        X = np.zeros([len(self.memory)] + feature_specs[configs.FEATURE_ENGINEERING].shape)
-        y = np.zeros((len(self.memory), 6))
-        batch = range(len(self.memory))
+        batch = np.random.choice(a=np.arange(0, len(self.memory)), size=min(SAMPLE_SIZE, len(self.memory)),
+                                 replace=False)
 
-    # extract information from each transition tuple (as stored above)
-    for i, index in enumerate(batch):
-        # get round and episode, and translate action from string to corresponding int
-        episode, state, action = self.memory[index].round, self.memory[index].state, ACTION_TRANSLATE[self.memory[index].action]
-
-        # get the reward of the N next steps, check that loop does not extend over length of memory
-        loop_until = min(index + N, len(self.memory))  # prevent index out of range error
-        rewards = np.array([self.memory[t].reward * (GAMMA **t) for t in range(index, loop_until)
-                            if self.memory[t].round == episode])
-        n_steps_reward = rewards.sum()
-
-        # standard case: non-terminal state and model is fit
-        if self.memory[loop_until-1].next_state is not None:
-            q_update = n_steps_reward + GAMMA ** N * \
-                       np.amax(self.model.predict_target(self.memory[loop_until-1].next_state))
-            # use the model to predict all the other q_values (below we replace the q_value for the selected action with this q_update)
-            q_values = self.model.predict_policy(state).reshape(-1)
-
-        # if we have a terminal state in the next states we cannot predict q-values for the terminal state
-        else:
-            q_update = n_steps_reward
-            # use the model to predict all the other q_values (below we replace the q_value for the selected action with this q_update)
-            q_values = self.model.predict_policy(state).reshape(-1)
-
-        # for the action that we actually took update the q-value according to above
-        q_values[action] = q_update
-
-        # append the predictors x=state, and response y=q_values
-        X[i], y[i] = state, q_values
+    X, y = states[batch,:], updated_Qs[batch,:]
 
     if configs.TS_AUGMENTATION:
         X, y = get_augmented_TS(configs.FEATURE_ENGINEERING, X, y)
@@ -339,53 +302,18 @@ def compute_priority(self):
     # predicting the original action-values for the state s_t
     old_Qs = self.model.predict_policy(states)
     # subsetting only the action-values of the actions that were actually taken
-    old_Qs_reduced = np.take_along_axis(old_Qs, actions[:,None], axis=1).reshape(-1)
+    old_Qs_reduced = np.take_along_axis(arr=old_Qs, indices=actions[:,None], axis=1).reshape(-1)
+    # update Q values (np.expand_dims is very useful here)
+    updated_Qs = old_Qs.copy()
+    np.put_along_axis(arr=updated_Qs, indices=np.expand_dims(actions, axis=1),
+                      values=np.expand_dims(q_updates, axis=1), axis=1)
     # computing the absolute temporal difference error
     TDs = np.abs(q_updates - old_Qs_reduced)
     # adding the constant e to ensure that every state has some probability
     TDs += configs.CONST_E
     # computing the probabilities/priorities from the TD errors
     priorities = (TDs ** configs.CONST_A) / (TDs ** configs.CONST_A).sum()
-    return priorities
-
-
-def get_priority(self):
-    """
-    Compute priority values for prioritized replay
-    :param self:
-    :return:
-    """
-    memory = self.memory
-    temporal_differences = np.zeros(len(memory))
-    for i in range(len(memory)):
-        # get episode and state
-        episode, state, action = memory[i].round, memory[i].state, ACTION_TRANSLATE[memory[i].action]
-
-        # get the reward of the N next steps, check that loop does not extend over length of memory
-        loop_until = min(i + N, len(self.memory))  # prevent index out of range error
-        rewards = np.array([self.memory[t].reward * (GAMMA **t) for t in range(i, loop_until)
-                            if self.memory[t].round == episode])
-        n_steps_reward = rewards.sum()
-
-        # standard case: non-terminal state and model is fit
-        if self.memory[loop_until-1].next_state is not None:
-            q_update = n_steps_reward + GAMMA ** N * \
-                       np.amax(self.model.predict_target(self.memory[loop_until-1].next_state))
-            q_values = self.model.predict_policy(state).reshape(-1)
-
-        # if we have a terminal state in the next states we cannot predict q-values for the terminal state
-        else:
-            q_update = n_steps_reward
-            q_values = self.model.predict_policy(state).reshape(-1)
-
-        temporal_differences[i] = np.abs(q_update - q_values[action])
-
-    # adding constant to ensure that no experience has 0 probability to be taken
-    temporal_differences += configs.CONST_E
-
-    # computing the priority values
-    priorities = (temporal_differences**configs.CONST_A)/(temporal_differences**configs.CONST_A).sum()
-    return priorities
+    return priorities, states, updated_Qs
 
 
 def get_augmented_TS(FEAT_ENG, TS_X, TS_y):
@@ -407,6 +335,9 @@ def get_augmented_TS(FEAT_ENG, TS_X, TS_y):
             Augmented_y[num_rot*TS_X.shape[0]:(num_rot+1)*TS_X.shape[0],:] = \
                 rotated_actions(num_rot, TS_y)
         return Augmented_X, Augmented_y
+
+    elif FEAT_ENG == "channels+bomb":
+        raise NotImplementedError
 
 
 def rotated_actions(rot, TS_y):

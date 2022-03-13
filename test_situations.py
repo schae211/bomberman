@@ -71,7 +71,7 @@ elif scenario == "2":
         "field": arena[0],
         "coins": arena[1],
         "self": ("my_agent", 0, True, (1, 2)),
-        "bombs": [((1, 3), 4), ((4, 5), 4)],
+        "bombs": [((1, 3), 3), ((4, 5), 3)],
         "explosion_map": np.zeros_like(arena[0])
     }
 
@@ -84,7 +84,7 @@ elif scenario == "3":
         "field": arena[0],
         "coins": arena[1],
         "self": ("my_agent", 0, True, (1, 2)),
-        "bombs": [((1, 3), 4), ((2, 3), 4), ((4, 1), 0)],
+        "bombs": [((1, 3), 3), ((2, 3), 3), ((4, 1), 0)],
         "explosion_map": np.zeros_like(arena[0])
     }
 

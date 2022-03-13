@@ -77,7 +77,7 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
     # specify that we want to use the global step information variable
     global step_information
 
-    # fill our memory after each step, state_to_features is defined in callbacks.py and imported above
+    # importantly, we will never fill our memory if the state is missing (old_game_state is None)
     if old_game_state:
         rewards = reward_from_events(self, events, old_game_state, new_game_state)
         self.memory.append(Transition(old_game_state["round"],              # round
@@ -96,13 +96,6 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
 
         # keep status of last N steps for reward shaping
         self.last_states.append(old_game_state["self"][3])
-
-    # first game state, can still be used by using the round information from the new game state
-    elif new_game_state and (new_game_state["round"] % INCLUDE_EVERY) == 0:
-        step_information["round"].append(new_game_state["round"])
-        step_information["step"].append(0)
-        step_information["events"].append("| ".join(map(repr, events)))
-        step_information["reward"].append(0)
 
 
 def end_of_round(self, last_game_state: dict, last_action: str, events: List[str]):
@@ -169,42 +162,8 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
     """
     Computing the rewards for our agent in a given step
     """
-
-    # for the first step nothing is returned, but I need the step argument to discount the coin reward
-    step = 0 if old_game_state is None else old_game_state["step"]
-
-    # define which auxiliary rewards should be considered:
-    if auxiliary_rewards.MOVE_TO_OR_FROM_COIN:
-        # add reward/penalty based on whether the agent moved towards/away from the nearest coin (if coins were visible)
-        if old_game_state and new_game_state and old_game_state["coins"] != []:
-            coin_info = coin_bfs(old_game_state["field"], old_game_state["coins"], old_game_state["self"][3])
-            if coin_info is not None:  # check whether we can even reach any revealed coin
-                next_move = coin_info[1][0]
-                if new_game_state["self"][3] == next_move:  # moved towards coin
-                    events.append(e.MOVE_TO_COIN)
-                elif old_game_state["self"][3] == new_game_state["self"][3]:  # not moved
-                    pass
-                else:  # moved away from coin
-                    events.append(e.MOVE_FROM_COIN)
-    elif auxiliary_rewards.STAY_OR_ESCAPE_BOMB:
-        # reward/penalize if escaping/running into bomb
-        if old_game_state and new_game_state and old_game_state["bombs"] != []:
-            explosion_map = get_bomb_map(old_game_state["field"], old_game_state["bombs"], old_game_state["explosion_map"])
-            # check if old position is in danger zone in explosion map
-            explosion_info = save_bfs(object_position=old_game_state["field"], explosion_map=explosion_map,
-                                      self_position=old_game_state["self"][3])
-            if explosion_info != ([], []):  # if the old position is not safe
-                next_move = explosion_info[1][0]
-                if new_game_state["self"][3] == next_move:  # if we did make the move suggested by bfs
-                    events.append(e.ESCAPE_FROM_BOMB)
-                else:
-                    events.append(e.STAY_IN_BOMB)
-    elif auxiliary_rewards.MOVE_IN_CIRCLES:
-        # check whether agent stayed in the same spot for too long (3 out of 5)
-        if new_game_state:
-            check_same_pos = np.array([state == new_game_state["self"][3] for state in self.last_states]).sum()
-            if check_same_pos >= 3:
-                events.append(e.MOVE_IN_CIRCLES)
+    # function computes auxiliary events/rewards and appends them to the event list and returns the extended event list
+    events = compute_auxiliary_rewards(self, events, old_game_state, new_game_state)
 
     game_rewards = {
         # original events
@@ -234,13 +193,12 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
 
     reward_sum = np.array([game_rewards[event] for event in events if event in game_rewards]).sum()
     self.logger.info(f"Awarded {reward_sum} for events {', '.join(events)}")
-
     return reward_sum
 
 
 def prep_memory(self):
     """
-    Prepare memory for input to numba function
+    Put our memory dequeue into np.arrays which are suitable to be process by numba jit compiled functions
     :param self:
     :return:
     """
@@ -252,29 +210,33 @@ def prep_memory(self):
     next_states = np.zeros([len(memory)] + feature_specs[configs.FEATURE_ENGINEERING].shape)
     rewards = np.zeros(len(memory))
     # initializing boolean arrays indicating whether a given state or next state was present or not
-    proper_states = np.ones(len(memory)).astype(np.bool)
     proper_next_states = np.ones(len(memory)).astype(np.bool)
     # now we need to loop through the dequeue and populate the np arrays.
     for i in range(len(memory)):
         episodes[i] = memory[i].round
         actions[i] = ACTION_TRANSLATE[memory[i].action]
         rewards[i] = self.memory[i].reward
+        states[i] = memory[i].state
 
-        if memory[i].state is None: proper_states[i] = False
-        else: states[i] = memory[i].state
-
-        if memory[i].next_state is None: proper_next_states[i] = False
-        else: next_states[i] = memory[i].next_state
+        if memory[i].next_state is None: proper_next_states[i] = False  # if next_state is terminal state,
+        else: next_states[i] = memory[i].next_state                     # we will just keep all the values zero!
+                                                                        # (and take note of it in proper_next_states)
 
     return episodes, states, actions, next_states, proper_next_states, rewards
 
 
 @jit(nopython=True)
 def compute_n_step_reward(episodes, rewards):
+    """
+    Compute the discounted sum of the next N steps for a given state S_t
+    :param episodes:
+    :param rewards:
+    :return:
+    """
     gammas = np.repeat(GAMMA, N)**(np.arange(N))            # gammas already taken to the power of the step
     n_step_rewards = np.zeros(len(episodes))                # initialize array to store the n_step rewards
     loop_untils = np.minimum(np.arange(len(episodes))+N,    # making sure to prevent index out of range errors
-                             len(episodes)-1)
+                             len(episodes))
     for i in range(len(n_step_rewards)):                    # looping through each step
 
         # get the reward of the N next steps, check that we do not include steps from the next episode
@@ -296,7 +258,7 @@ def compute_priority(self):
     # st_plus_N_Qs contains the maximum action-value for the state s_(t+N) if this state exists, otherwise is should simply be zero (which it will be since we initialized with 0)
     st_plus_N_Qs = np.zeros(len(n_step_rewards))
     st_plus_N_Qs[proper_next_states] = \
-        np.amax(self.model.predict_target(next_states[loop_untils[proper_next_states],:]), axis=1)
+        np.amax(self.model.predict_target(next_states[(loop_untils-1)[proper_next_states],:]), axis=1)
     # adding together the discounted rewards for the next N steps and the maximum action-value of the state s_(t+N)
     q_updates = (n_step_rewards + st_plus_N_Qs)
     # predicting the original action-values for the state s_t
@@ -402,3 +364,39 @@ def rotated_standard_features(rot, TS_X):
         for i, new_i in enumerate(order_270):
             rotated_X[:, i] = TS_X[:, new_i]
     return rotated_X
+
+
+# define function to compute auxiliary rewards
+def compute_auxiliary_rewards(self, events, old_game_state, new_game_state):
+    if auxiliary_rewards.MOVE_TO_OR_FROM_COIN:
+        # add reward/penalty based on whether the agent moved towards/away from the nearest coin (if coins were visible)
+        if old_game_state and new_game_state and old_game_state["coins"] != []:
+            coin_info = coin_bfs(old_game_state["field"], old_game_state["coins"], old_game_state["self"][3])
+            if coin_info is not None:  # check whether we can even reach any revealed coin
+                next_move = coin_info[1][0]
+                if new_game_state["self"][3] == next_move:  # moved towards coin
+                    events.append(e.MOVE_TO_COIN)
+                elif old_game_state["self"][3] == new_game_state["self"][3]:  # not moved
+                    pass
+                else:  # moved away from coin
+                    events.append(e.MOVE_FROM_COIN)
+    elif auxiliary_rewards.STAY_OR_ESCAPE_BOMB:
+        # reward/penalize if escaping/running into bomb
+        if old_game_state and new_game_state and old_game_state["bombs"] != []:
+            explosion_map = get_bomb_map(old_game_state["field"], old_game_state["bombs"], old_game_state["explosion_map"])
+            # check if old position is in danger zone in explosion map
+            explosion_info = save_bfs(object_position=old_game_state["field"], explosion_map=explosion_map,
+                                      self_position=old_game_state["self"][3])
+            if explosion_info != ([], []):  # if the old position is not safe
+                next_move = explosion_info[1][0]
+                if new_game_state["self"][3] == next_move:  # if we did make the move suggested by bfs
+                    events.append(e.ESCAPE_FROM_BOMB)
+                else:
+                    events.append(e.STAY_IN_BOMB)
+    elif auxiliary_rewards.MOVE_IN_CIRCLES:
+        # check whether agent stayed in the same spot for too long (3 out of 5)
+        if new_game_state:
+            check_same_pos = np.array([state == new_game_state["self"][3] for state in self.last_states]).sum()
+            if check_same_pos >= 3:
+                events.append(e.MOVE_IN_CIRCLES)
+    return events

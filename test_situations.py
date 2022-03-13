@@ -49,7 +49,7 @@ def build_arena(COLS, ROWS, CRATE_DENSITY, COIN_COUNT, SEED):
 
     return arena, collectable_coins
 
-scenario = "crate_far_away"
+scenario = "enemy_close_by"
 
 if scenario == "1":
     arena = build_arena(17, 17, 0.2, 50, 42)
@@ -59,6 +59,7 @@ if scenario == "1":
         "field": arena[0],
         "coins": arena[1],
         "self": ("my_agent", 0, True, (1, 1)),
+        "others": [],
         "bombs": [((3, 3), 3), ((1, 1), 0)],
         "explosion_map": np.zeros_like(arena[0])
     }
@@ -71,6 +72,7 @@ elif scenario == "2":
         "field": arena[0],
         "coins": arena[1],
         "self": ("my_agent", 0, True, (1, 2)),
+        "others": [],
         "bombs": [((1, 3), 3), ((4, 5), 3)],
         "explosion_map": np.zeros_like(arena[0])
     }
@@ -84,6 +86,7 @@ elif scenario == "3":
         "field": arena[0],
         "coins": arena[1],
         "self": ("my_agent", 0, True, (1, 2)),
+        "others": [],
         "bombs": [((1, 3), 3), ((2, 3), 3), ((4, 1), 0)],
         "explosion_map": np.zeros_like(arena[0])
     }
@@ -96,6 +99,7 @@ elif scenario == "suicide":
         "field": arena[0],
         "coins": arena[1],
         "self": ("my_agent", 0, True, (1, 1)),
+        "others": [],
         "bombs": [],
         "explosion_map": np.zeros_like(arena[0])
     }
@@ -113,72 +117,94 @@ elif scenario == "crate_far_away":
         "field": arena[0],
         "coins": arena[1],
         "self": ("my_agent", 0, True, (1, 1)),
+        "others": [],
         "bombs": [],
         "explosion_map": np.zeros_like(arena[0])
     }
 
-# Situational awareness, indicating in which directions the agent can move
-# Add is bomb action possible?
-awareness = get_awareness(object_position=game_state["field"], self_position=game_state["self"][3])
+elif scenario == "enemy_close_by":
+    arena = build_arena(17, 17, 0.7, 50, 42)
+    field = arena[0]
+    for x in range(0, 8):
+        for y in range(0, 8):
+            if field[x, y] == 1:
+                field[x, y] = 0
+    game_state = {
+        "round": 1,
+        "step": 1,
+        "field": arena[0],
+        "coins": arena[1],
+        "self": ("my_agent", 0, True, (1, 1)),
+        "others": [("other_agent", 0, True, (3, 2))],
+        "bombs": [],
+        "explosion_map": np.zeros_like(arena[0])
+    }
 
-# Direction to the closest coin determined by BFS
-coin_direction = get_coin_direction(object_position=game_state["field"], coin_list=game_state["coins"],
-                                    self_position=game_state["self"][3])
-coin_info = coin_bfs(game_state["field"], game_state["coins"], game_state["self"][3])
 
-# 2D array indicating which area is affected by exploded bombs or by bombs which are about to explode
-explosion_map = get_bomb_map(object_position=game_state["field"], bomb_list=game_state["bombs"],
-                             explosion_position=game_state["explosion_map"])
-save_info = save_bfs(game_state["field"], explosion_map, game_state["self"][3])
-
-# 1D array indicating in which direction to flee from bomb if immediate danger
-# if no immediate danger return 5 zeros or current spot is safe returns all zeros, otherwise direction
-safe_direction = get_safe_direction(object_position=game_state["field"], explosion_map=explosion_map,
-                                    self_position=game_state["self"][3])
-
-# 1D array indicating whether current field, up, right, down, left are dangerous
-danger = get_danger(explosion_map=explosion_map, self_position=game_state["self"][3])
-
-crate_direction = get_crate_direction(object_position=game_state["field"], explosion_map=explosion_map,
-                                      self_position=game_state["self"][3], bomb_list=game_state["bombs"])
-crate_info = crate_bfs(object_position=game_state["field"], self_position=game_state["self"][3],
-                       explosion_map=explosion_map, bomb_list=game_state["bombs"])
-
-# 1D array indicating whether bomb can be dropped and survival is possible
-bomb_info = get_bomb_info(object_position=game_state["field"], explosion_map=explosion_map,
-                          self=game_state["self"], bomb_list=game_state["bombs"])
-
-features = np.concatenate([awareness,
-                           danger,
-                           safe_direction,
-                           coin_direction,
-                           crate_direction,
-                           bomb_info])
-
-# channels
 object_map = game_state["field"]
 
-# for the coin challenge we need to know where the agent is, where walls are and where the coins are
-# so, we create a coin map in the same shape as the field
 coin_map = np.zeros_like(game_state["field"])
-for cx, cy in game_state["coins"]:
-    coin_map[cx, cy] = 1
+for cx, cy in game_state["coins"]: coin_map[cx, cy] = 1
 
-# also adding where one self is on the map
 self_map = np.zeros_like(game_state["field"])
 self_map[game_state["self"][3]] = 1
 
 explosion_map = get_bomb_map(object_position=game_state["field"], bomb_list=game_state["bombs"],
                              explosion_position=game_state["explosion_map"])
 
+other_agents = np.zeros_like(game_state["field"])
+for (_, _, _, (cx, cy)) in game_state["others"]: other_agents[cx, cy] = 1
+
 # create channels based on the field and coin information.
-channels = [object_map, self_map, coin_map, explosion_map]
+channels = [object_map, self_map, coin_map, explosion_map, other_agents]
 
-# concatenate them as a feature tensor (they must have the same shape), ...
+# concatenate them as a feature tensor
 stacked_channels = np.stack(channels)
-# and return them as a vector
-stacked_channels = stacked_channels.reshape(-1)
 
+
+# 1. 1D array, len = 4: indicating in which directions the agent can move (up, right, down, left)
+awareness = get_awareness(object_position=game_state["field"], self_position=game_state["self"][3])
+
+# 2. 1D array, len = 4:  indicating in which direction lays the closest coin determined by BFS (up, right, down, left)
+coin_direction = get_coin_direction(object_position=game_state["field"], coin_list=game_state["coins"],
+                                    self_position=game_state["self"][3])
+
+# 2D array indicating which area is affected by exploded bombs or by bombs which are about to explode
+explosion_map = get_bomb_map(object_position=game_state["field"], bomb_list=game_state["bombs"],
+                             explosion_position=game_state["explosion_map"])
+
+# 3. 1D array, len = 5:  indicating how dangerous the current field, up, right, down, left are
+danger = get_danger(explosion_map=explosion_map, self_position=game_state["self"][3])
+
+# 4. 1D array, len = 5:  indicating in which direction to flee from bomb if immediate danger (current, up, right, down, left),
+# if no immediate danger/current spot is safe returns all zeros, otherwise direction
+safe_direction = get_safe_direction(object_position=game_state["field"], explosion_map=explosion_map,
+                                    self_position=game_state["self"][3])
+
+# 5. 1D array, len = 5:  indicating in which direction lays the most lucrative position for laying a bomb
+# that destroys most crates penalized by the distance as determined by BFS (up, right, down, left)
+crate_direction = get_crate_direction(object_position=game_state["field"], bomb_list=game_state["bombs"],
+                                      self_position=game_state["self"][3], explosion_map=explosion_map)
+
+# 6. 1D array, len = 2: indicating whether bomb can be dropped and survival is possible
+bomb_info = get_bomb_info(object_position=game_state["field"], explosion_map=explosion_map,
+                          self=game_state["self"], bomb_list=game_state["bombs"])
+
+# TODO: Add other agents information, to aid attacking them
+#   Add feature vector with len 5 indicating whether target was acquired and in which direction
+others_direction = get_others_direction(object_position=game_state["field"], bomb_list=game_state["bombs"],
+                                        self_position=game_state["self"][3], explosion_map=explosion_map,
+                                        others=game_state["others"])
+
+features = np.concatenate([awareness,
+                           danger,
+                           safe_direction,
+                           coin_direction,
+                           crate_direction,
+                           bomb_info,
+                           others_direction])
+
+print_field(game_state)
 print_channels(channels)
 
 

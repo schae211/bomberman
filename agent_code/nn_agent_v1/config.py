@@ -6,7 +6,7 @@ import pandas as pd
 
 configs = edict({
     # which agent to use: {"MLP", "CNN"}
-    "AGENT": "CNN",
+    "AGENT": "MLP",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 1,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
@@ -30,7 +30,7 @@ configs = edict({
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb"}
-    "FEATURE_ENGINEERING": "channels",
+    "FEATURE_ENGINEERING": "standard",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
@@ -41,7 +41,7 @@ configs = edict({
     "CONST_E": 1,
     "CONST_A": 0.8,
     # how often to update the target network
-    "UPDATE_FREQ": 100,
+    "UPDATE_FREQ": 10,
     # whether to load a model
     "LOAD": False,
     # where to load the model
@@ -85,10 +85,10 @@ reward_specs = edict({
 # needed for generating the right shapes
 feature_specs = edict({
     "channels": edict({
-        "shape": [4, 17, 17]
+        "shape": [5, 17, 17]
     }),
     "standard": edict({
-        "shape": [25]
+        "shape": [30]
     })
 })
 

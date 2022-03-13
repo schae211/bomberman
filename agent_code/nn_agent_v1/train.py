@@ -17,42 +17,27 @@ ACTION_TRANSLATE = {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3, "WAIT": 4, "BOMB"
 ACTION_TRANSLATE_REV = {val: key for key, val in ACTION_TRANSLATE.items()}
 
 
-# Hyper parameters -> simply import from config dict?
-GAMMA = configs.GAMMA
-EPSILON = configs.EPSILON
-EPSILON_REDUCTION = configs.EPSILON_DECAY
-MIN_EPSILON = configs.EPSILON_MIN
-N = configs.N_STEPS
-MEMORY_SIZE = configs.MEMORY_SIZE
-SAMPLE_SIZE = configs.SAMPLE_SIZE
-AUGMENT = configs.TS_AUGMENTATION
-
-
 # Saving training statistics
-SAVE_EVERY = 100  #
+SAVE_EVERY = 100   # write the stats to disk (csv) every x episodes
 INCLUDE_EVERY = 4  # only include every x episode in the saved stats
-SAVE_DIR = configs.MODEL_LOC
 step_information = {"round": [], "step": [], "events": [], "reward": []}
-episode_information = {"round": [], "TS_MSE_1": [], "TS_MSE_2": [], "TS_MSE_3": [],
-                       "TS_MSE_4": [], "TS_MSE_5": [], "TS_MSE_6": []}
+episode_information = {"round": [], "TS_MSE_1": [], "TS_MSE_2": [], "TS_MSE_3": [], "TS_MSE_4": [], "TS_MSE_5": [], "TS_MSE_6": []}
 
 
 def setup_training(self):
     """
     Initialise self for training purpose.
-
     This is called after `setup` in callbacks.py.
-
     :param self: This object is passed to all callbacks and you can set arbitrary values.
     """
     # Set up an array that will keep track of transition tuples (s, a, r, s')
-    self.memory = deque(maxlen=MEMORY_SIZE)
+    self.memory = deque(maxlen=configs.MEMORY_SIZE)
     self.last_states = deque(maxlen=5)  # used for reward shaping
 
     # adding epsilon var to agent
-    self.epsilon = EPSILON
-    self.epsilon_reduction = EPSILON_REDUCTION
-    self.epsilon_min = MIN_EPSILON
+    self.epsilon = configs.EPSILON
+    self.epsilon_reduction = configs.EPSILON_DECAY
+    self.epsilon_min = configs.EPSILON_MIN
 
 
 def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_state: dict, events: List[str]):
@@ -123,7 +108,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         step_information["reward"].append(reward_from_events(self, events, last_game_state, None))
 
     if last_game_state["round"] % SAVE_EVERY == 0:  # save the TS stats about every x rounds.
-        pd.DataFrame(step_information).to_csv(f"{SAVE_DIR}/{SAVE_TIME}_{SAVE_KEY}_game_stats.csv", index=False)
+        pd.DataFrame(step_information).to_csv(f"{configs.MODEL_LOC}/{SAVE_TIME}_{SAVE_KEY}_game_stats.csv", index=False)
 
     # updating the target network
     if last_game_state["round"] % configs.UPDATE_FREQ == 0:
@@ -132,10 +117,10 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     priorities, states, updated_Qs = compute_priority(self)
 
     if configs.PRIORITIZED_REPLAY:
-        batch = np.random.choice(a=np.arange(0, len(self.memory)), size=min(SAMPLE_SIZE, len(self.memory)),
+        batch = np.random.choice(a=np.arange(0, len(self.memory)), size=min(configs.SAMPLE_SIZE, len(self.memory)),
                                  replace=False, p=priorities)
     else:
-        batch = np.random.choice(a=np.arange(0, len(self.memory)), size=min(SAMPLE_SIZE, len(self.memory)),
+        batch = np.random.choice(a=np.arange(0, len(self.memory)), size=min(configs.SAMPLE_SIZE, len(self.memory)),
                                  replace=False)
 
     X, y = states[batch,:], updated_Qs[batch,:]
@@ -154,7 +139,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         for i in range(6): episode_information[f"TS_MSE_{i+1}"].append(TS_MSE[i])
 
     if last_game_state["round"] % SAVE_EVERY == 0:
-        pd.DataFrame(episode_information).to_csv(f"{SAVE_DIR}/{SAVE_TIME}_{SAVE_KEY}_episode_stats.csv", index=False)
+        pd.DataFrame(episode_information).to_csv(f"{configs.MODEL_LOC}/{SAVE_TIME}_{SAVE_KEY}_episode_stats.csv", index=False)
 
 
 # this is where we are going to specify the rewards for certain actions
@@ -226,7 +211,7 @@ def prep_memory(self):
 
 
 @jit(nopython=True)
-def compute_n_step_reward(episodes, rewards):
+def compute_n_step_reward(episodes, rewards, N, GAMMA):
     """
     Compute the discounted sum of the next N steps for a given state S_t
     :param episodes:
@@ -254,7 +239,7 @@ def compute_n_step_reward(episodes, rewards):
 def compute_priority(self):
     episodes, states, actions, next_states, proper_next_states, rewards = prep_memory(self)
     # n_step rewards contains the sum of the discounted rewards of the 10 next steps
-    n_step_rewards, loop_untils = compute_n_step_reward(episodes, rewards)
+    n_step_rewards, loop_untils = compute_n_step_reward(episodes, rewards, configs.N_STEPS, configs.GAMMA)
     # st_plus_N_Qs contains the maximum action-value for the state s_(t+N) if this state exists, otherwise is should simply be zero (which it will be since we initialized with 0)
     st_plus_N_Qs = np.zeros(len(n_step_rewards))
     st_plus_N_Qs[proper_next_states] = \
@@ -346,10 +331,10 @@ def rotated_standard_features(rot, TS_X):
     to 270° rotation:                       ["RIGHT", "DOWN", "LEFT", "UP", "WAIT", "BOMB"]
     keep waiting and bomb the same
     """
-    order_orig = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
-    order_90 =   [1, 2, 3, 0, 4, 6, 7, 8, 5, 9, 11, 12, 13, 10, 15, 16, 17, 14, 18, 20, 21, 22, 20, 23, 24]
-    order_180 =  [2, 3, 0, 1, 4, 7, 8, 5, 6, 9, 12, 13, 10, 11, 16, 17, 14, 15, 18, 21, 22, 19, 20, 23, 24]
-    order_270 =  [3, 0, 1, 2, 4, 8, 5, 6, 7, 9, 13, 10, 11, 12, 17, 14, 15, 16, 18, 22, 19, 20, 21, 23, 24]
+    order_orig = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+    order_90 =   [1, 2, 3, 0, 4, 6, 7, 8, 5, 9, 11, 12, 13, 10, 15, 16, 17, 14, 18, 20, 21, 22, 20, 23, 24, 25, 27, 28, 29, 26]
+    order_180 =  [2, 3, 0, 1, 4, 7, 8, 5, 6, 9, 12, 13, 10, 11, 16, 17, 14, 15, 18, 21, 22, 19, 20, 23, 24, 25, 28, 29, 26, 27]
+    order_270 =  [3, 0, 1, 2, 4, 8, 5, 6, 7, 9, 13, 10, 11, 12, 17, 14, 15, 16, 18, 22, 19, 20, 21, 23, 24, 25, 29, 26, 27, 28]
 
     rotated_X = np.zeros_like(TS_X)
     if rot == 0:

@@ -34,8 +34,8 @@ class DoubleCNNModel(nn.Module):
             self.target_net.eval()
         else:
             print("INITIALIZE MODEL")
-            self.policy_net = CNN(input_channel=4)
-            self.target_net = CNN(input_channel=4)
+            self.policy_net = CNN(input_channel=5)
+            self.target_net = CNN(input_channel=5)
             self.target_net.load_state_dict(self.policy_net.state_dict())
             self.optimizer = torch.optim.AdamW(self.policy_net.parameters(), lr=configs.LEARNING_RATE)
         self.policy_net.to(device)
@@ -105,7 +105,7 @@ class ConvMaxPool(nn.Module):
 
 
 class CNN(nn.Module):
-    def __init__(self, input_channel=4):
+    def __init__(self, input_channel=5):
         super(CNN, self).__init__()
         self.cnn_layer = nn.Sequential(ConvMaxPool(input_channel=input_channel, output_channel=8,
                                              max_pooling=False),

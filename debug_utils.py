@@ -63,7 +63,7 @@ def print_field(game_state):
 
 
 def print_channels(channels):
-    object_map, self_map, coin_map, explosion_map = channels[0], channels[1], channels[2], channels[3]
+    object_map, self_map, coin_map, explosion_map, others_map = channels[0], channels[1], channels[2], channels[3], channels[4]
 
     fig, axis = plt.subplots(2, 2)
     fig.set_size_inches(12, 10)
@@ -80,8 +80,8 @@ def print_channels(channels):
     axis[2].set_title("Explosion Map")
     plt.colorbar(im3, ax=axis[2])
 
-    im4 = axis[3].imshow(self_map)
-    axis[3].set_title("Self Map")
+    im4 = axis[3].imshow(self_map + 1/2 * others_map)
+    axis[3].set_title("Self/Others Map")
     plt.colorbar(im4, ax=axis[3])
     plt.show()
 

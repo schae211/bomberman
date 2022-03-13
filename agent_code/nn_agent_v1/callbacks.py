@@ -97,8 +97,11 @@ def state_to_features(game_state: dict) -> np.array:
         explosion_map = get_bomb_map(object_position=game_state["field"], bomb_list=game_state["bombs"],
                                      explosion_position=game_state["explosion_map"])
 
+        other_agents = np.zeros_like(game_state["field"])
+        for (_, _, _, (cx, cy)) in game_state["others"]: other_agents[cx, cy] = 1
+
         # create channels based on the field and coin information.
-        channels = [object_map, self_map, coin_map, explosion_map]
+        channels = [object_map, self_map, coin_map, explosion_map, other_agents]
 
         # concatenate them as a feature tensor
         stacked_channels = np.stack(channels)
@@ -137,13 +140,18 @@ def state_to_features(game_state: dict) -> np.array:
                                   self=game_state["self"], bomb_list=game_state["bombs"])
 
         # TODO: Add other agents information, to aid attacking them
+        #   Add feature vector with len 5 indicating whether target was acquired and in which direction
+        others_direction = get_others_direction(object_position=game_state["field"], bomb_list=game_state["bombs"],
+                                                self_position=game_state["self"][3], explosion_map=explosion_map,
+                                                others=game_state["others"])
 
         features = np.concatenate([awareness,
                                    danger,
                                    safe_direction,
                                    coin_direction,
                                    crate_direction,
-                                   bomb_info])
+                                   bomb_info,
+                                   others_direction])
 
         return features[None,:]
 
@@ -161,8 +169,11 @@ def state_to_features(game_state: dict) -> np.array:
         explosion_map = get_bomb_map(object_position=game_state["field"], bomb_list=game_state["bombs"],
                                      explosion_position=game_state["explosion_map"])
 
+        other_agents = np.zeros_like(game_state["field"])
+        for (_, _, _, (cx, cy)) in game_state["others"]: other_agents[cx, cy] = 1
+
         # create channels based on the field and coin information.
-        channels = [object_map, self_map, coin_map, explosion_map]
+        channels = [object_map, self_map, coin_map, explosion_map, other_agents]
 
         # concatenate them as a feature tensor
         stacked_channels = np.stack(channels)
@@ -570,3 +581,101 @@ def get_bomb_info(object_position, explosion_map, bomb_list, self):
     return bomb_info
 
 
+def get_others_direction(object_position, bomb_list, self_position, explosion_map, others):
+    others_position = np.zeros_like(object_position)
+    for (_, _, _, (cx, cy)) in others: others_position[cx, cy] += 1
+    others_direction = np.zeros(5)
+    others_info = other_bfs(object_position, bomb_list, self_position, explosion_map, others_position, max_dist=16)
+
+    if others_info is not None:  # None is returned if destruction score was negative for all considered positions
+        others_direction[0] = 1              # indicating that a target was found
+        if others_info == ([], []):          # if current position, keep all directional indicators 0
+            pass
+        elif others_info[0][0] == "up":
+            others_direction[1] = 1
+        elif others_info[0][0] == "right":
+            others_direction[2] = 1
+        elif others_info[0][0] == "down":
+            others_direction[3] = 1
+        elif others_info[0][0] == "left":
+            others_direction[4] = 1
+
+    return others_direction
+
+
+def other_bfs(object_position, bomb_list, self_position, explosion_map, others_position, max_dist=16):
+    q = Queue()
+    explored = set()
+    # add start to the Queue
+    q.put(Node(position=self_position, parent_position=None, move=None))
+    # loop over the queue as long as it is not empty
+    while True:
+        # if we cannot reach any revealed coin
+        if q.empty(): return None
+        # always get first element
+        node = q.get()
+        # found a position to kill enemies and laying a bomb there is no suicide
+        if get_destroyed_agents(object_position, node.position, others_position) >= 1 and \
+                check_survival(object_position, bomb_list, node.position, explosion_map):
+            actions, cells = [], []
+            # Backtracking: From each node grab state and action; and then redefine node as parent node
+            while node.parent_position is not None:
+                actions.append(node.move)
+                cells.append(node.position)
+                node = node.parent_position
+            actions.reverse()
+            cells.reverse()
+            return actions, cells
+        explored.add(node.position)
+        # only add neighbors that are closer than the maximal distance
+        dist_to_self = np.abs(np.array(node.position) - np.array(self_position)).sum()
+        if dist_to_self <= max_dist:
+            neighbors = get_neighbors(object_position, node.position)
+            for action, neighbor in zip(neighbors["actions"], neighbors["neighbors"]):
+                if neighbor not in explored and not q.contains_state(neighbor):
+                    child = Node(position=neighbor, parent_position=node, move=action)
+                    q.put(child)
+
+
+def get_destroyed_agents(object_position, bomb_position, other_positions):
+    """
+    Compute the number of destroyed crates for a given bomb position
+    :param object_position: numpy 2D array: game_state["field"]
+    :param bomb_position: coordinate tuple (x,y)
+    :return: int: number of destroyed crates
+    """
+    destroyed_others = 0
+    # check above
+    for up_x in range(bomb_position[0] - 1, bomb_position[0] - 4, -1):
+        if 0 <= up_x <= 16:
+            if object_position[up_x, bomb_position[1]] == -1:
+                break
+            else:
+                # if a crate is present at the position add to destroyed crates counter
+                if other_positions[up_x, bomb_position[1]] == 1:
+                    destroyed_others += 1
+    # check below
+    for down_x in range(bomb_position[0] + 1, bomb_position[0] + 4, 1):
+        if 0 <= down_x <= 16:
+            if object_position[down_x, bomb_position[1]] == -1:
+                break
+            else:
+                if other_positions[down_x, bomb_position[1]] == 1:
+                    destroyed_others += 1
+    # check to the left
+    for left_y in range(bomb_position[1] - 1, bomb_position[1] - 4, -1):
+        if 0 <= left_y <= 16:
+            if object_position[bomb_position[0], left_y] == -1:
+                break
+            else:
+                if other_positions[bomb_position[0], left_y] == 1:
+                    destroyed_others += 1
+    # check to the right
+    for right_y in range(bomb_position[1] + 1, bomb_position[1] + 4, 1):
+        if 0 <= right_y <= 16:
+            if object_position[bomb_position[0], right_y] == -1:
+                break
+            else:
+                if other_positions[bomb_position[0], right_y] == 1:
+                    destroyed_others += 1
+    return destroyed_others

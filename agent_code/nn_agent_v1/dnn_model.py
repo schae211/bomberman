@@ -5,16 +5,13 @@ from torch.utils.data import DataLoader, Dataset
 import numpy as np
 from agent_code.nn_agent_v1.config import configs, SAVE_KEY, SAVE_TIME
 
-
-# Hyperparameters
+# Which loss function should be used
 if configs.LOSS == "huber": LOSS_FUNCTION = nn.HuberLoss()
 if configs.LOSS == "mse": LOSS_FUNCTION = nn.MSELoss()
 
-
-# Set device
+# Set device (either cpu or cuda)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
-
 
 class DoubleNNModel(nn.Module):
     """
@@ -89,6 +86,9 @@ class DoubleNNModel(nn.Module):
 
 
 class MLP(nn.Module):
+    """
+    Pytorch based implementation of a multilayer perceptron with one hidden layer
+    """
     def __init__(self, input_size=25, output_size=6, hidden_size=128):
         super(MLP, self).__init__()
         self.net = nn.Sequential(nn.Linear(input_size, hidden_size),

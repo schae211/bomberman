@@ -31,8 +31,8 @@ class DoubleNNModel(nn.Module):
             self.target_net.eval()
         else:
             print("INITIALIZE MODEL")
-            self.policy_net = MLP(input_size=25, output_size=6, hidden_size=128)
-            self.target_net = MLP(input_size=25, output_size=6, hidden_size=128)
+            self.policy_net = MLP(input_size=30, output_size=6, hidden_size=128)
+            self.target_net = MLP(input_size=30, output_size=6, hidden_size=128)
             self.target_net.load_state_dict(self.policy_net.state_dict())
             self.optimizer = torch.optim.AdamW(self.policy_net.parameters(), lr=configs.LEARNING_RATE)
         self.policy_net.to(device)
@@ -89,7 +89,7 @@ class MLP(nn.Module):
     """
     Pytorch based implementation of a multilayer perceptron with one hidden layer
     """
-    def __init__(self, input_size=25, output_size=6, hidden_size=128):
+    def __init__(self, input_size=30, output_size=6, hidden_size=128):
         super(MLP, self).__init__()
         self.net = nn.Sequential(nn.Linear(input_size, hidden_size),
                                  nn.ReLU(),

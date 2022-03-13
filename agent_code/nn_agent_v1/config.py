@@ -9,9 +9,9 @@ configs = edict({
     "AGENT": "CNN",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 1,
-    # epsilon-greedy strategy decay parameter: epsilon(t) := epsilon(t-1) * decay^(#episode)
+    # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
     "EPSILON_DECAY": 0.9998,
-    # epsilon-greedy strategy minimum epsilon: epsilon(t) := max(0.05, epsilon(t-1) * decay^(#episode))
+    # epsilon-greedy strategy minimum epsilon: epsilon := max(0.05, epsilon * decay^(#episode))
     "EPSILON_MIN": 0.01,
     # discount factor gamma, which discount future rewards
     "GAMMA": 0.9,

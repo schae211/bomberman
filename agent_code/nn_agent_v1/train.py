@@ -334,12 +334,17 @@ def compute_priority(self):
     st_plus_N_Qs = np.zeros(len(n_step_rewards))
     st_plus_N_Qs[proper_next_states] = \
         np.amax(self.model.predict_target(next_states[loop_untils[proper_next_states],:]), axis=1)
-    # adding together the discounted rewards for the next N steps and the 
+    # adding together the discounted rewards for the next N steps and the maximum action-value of the state s_(t+N)
     q_updates = (n_step_rewards + st_plus_N_Qs)
+    # predicting the original action-values for the state s_t
     old_Qs = self.model.predict_policy(states)
+    # subsetting only the action-values of the actions that were actually taken
     old_Qs_reduced = np.take_along_axis(old_Qs, actions[:,None], axis=1).reshape(-1)
+    # computing the absolute temporal difference error
     TDs = np.abs(q_updates - old_Qs_reduced)
+    # adding the constant e to ensure that every state has some probability
     TDs += configs.CONST_E
+    # computing the probabilities/priorities from the TD errors
     priorities = (TDs ** configs.CONST_A) / (TDs ** configs.CONST_A).sum()
     return priorities
 

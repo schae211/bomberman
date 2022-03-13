@@ -3,6 +3,7 @@ from collections import namedtuple, deque
 import numpy as np
 from typing import List
 import pandas as pd
+from numba import jit
 
 import events as e
 from agent_code.nn_agent_v1.callbacks import state_to_features, coin_bfs, save_bfs, get_bomb_map
@@ -143,25 +144,20 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         # Prioritized Replay: Before building our training dataset, we need to compute the temporal difference error
         # for transitions currently stored in the memory (aka replay buffer).
         if configs.PRIORITIZED_REPLAY:
-            priorities = get_priority(self)
+            #priorities = get_priority(self)
+            priorities = compute_priority(self)
             batch = np.random.choice(a=np.arange(0, len(self.memory)), size=SAMPLE_SIZE, replace=False, p=priorities)
         else:
             batch = np.random.choice(a=np.arange(0, len(self.memory)), size=SAMPLE_SIZE, replace=False)
     else:
         X = np.zeros([len(self.memory)] + feature_specs[configs.FEATURE_ENGINEERING].shape)
         y = np.zeros((len(self.memory), 6))
-
         batch = range(len(self.memory))
 
     # extract information from each transition tuple (as stored above)
     for i, index in enumerate(batch):
-        # get round and episode
-        episode, state= self.memory[index].round, self.memory[index].state
-        # translate action to int
-        action = ACTION_TRANSLATE[self.memory[index].action]
-        # check whether state is none, which corresponds to the first state
-        if self.memory[i].state is None:
-            continue
+        # get round and episode, and translate action from string to corresponding int
+        episode, state, action = self.memory[index].round, self.memory[index].state, ACTION_TRANSLATE[self.memory[index].action]
 
         # get the reward of the N next steps, check that loop does not extend over length of memory
         loop_until = min(index + N, len(self.memory))  # prevent index out of range error
@@ -170,9 +166,9 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         n_steps_reward = rewards.sum()
 
         # standard case: non-terminal state and model is fit
-        if self.memory[len(rewards) - 1].next_state is not None:
+        if self.memory[loop_until-1].next_state is not None:
             q_update = n_steps_reward + GAMMA ** N * \
-                       np.amax(self.model.predict_target(self.memory[len(rewards) - 1].next_state))
+                       np.amax(self.model.predict_target(self.memory[loop_until-1].next_state))
             # use the model to predict all the other q_values (below we replace the q_value for the selected action with this q_update)
             q_values = self.model.predict_policy(state).reshape(-1)
 
@@ -279,9 +275,77 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
     return reward_sum
 
 
+def prep_memory(self):
+    """
+    Prepare memory for input to numba function
+    :param self:
+    :return:
+    """
+    memory = self.memory
+    # translating memory to numpy arrays suitable for processing with numba jit compilation
+    episodes = np.zeros(len(memory))
+    states = np.zeros([len(memory)] + feature_specs[configs.FEATURE_ENGINEERING].shape)
+    actions = np.zeros(len(memory)).astype(np.int)
+    next_states = np.zeros([len(memory)] + feature_specs[configs.FEATURE_ENGINEERING].shape)
+    rewards = np.zeros(len(memory))
+    # initializing boolean arrays indicating whether a given state or next state was present or not
+    proper_states = np.ones(len(memory)).astype(np.bool)
+    proper_next_states = np.ones(len(memory)).astype(np.bool)
+    # now we need to loop through the dequeue and populate the np arrays.
+    for i in range(len(memory)):
+        episodes[i] = memory[i].round
+        actions[i] = ACTION_TRANSLATE[memory[i].action]
+        rewards[i] = self.memory[i].reward
+
+        if memory[i].state is None: proper_states[i] = False
+        else: states[i] = memory[i].state
+
+        if memory[i].next_state is None: proper_next_states[i] = False
+        else: next_states[i] = memory[i].next_state
+
+    return episodes, states, actions, next_states, proper_next_states, rewards
+
+
+@jit(nopython=True)
+def compute_n_step_reward(episodes, rewards):
+    gammas = np.repeat(GAMMA, N)**(np.arange(N))            # gammas already taken to the power of the step
+    n_step_rewards = np.zeros(len(episodes))                # initialize array to store the n_step rewards
+    loop_untils = np.minimum(np.arange(len(episodes))+N,    # making sure to prevent index out of range errors
+                             len(episodes)-1)
+    for i in range(len(n_step_rewards)):                    # looping through each step
+
+        # get the reward of the N next steps, check that we do not include steps from the next episode
+        r = np.zeros(N)
+        for idx, t in enumerate(range(i, loop_untils[i])):
+            if episodes[t] == episodes[i]:
+                r[idx] = rewards[t]
+
+        r *= gammas
+        n_step_rewards[i] = r.sum()
+
+    return n_step_rewards, loop_untils
+
+
+def compute_priority(self):
+    episodes, states, actions, next_states, proper_next_states, rewards = prep_memory(self)
+    # n_step rewards contains the sum of the discounted rewards of the 10 next steps
+    n_step_rewards, loop_untils = compute_n_step_reward(episodes, rewards)
+    # st_plus_N_Qs contains the maximum action-value for the state s_(t+N) if this state exists, otherwise is should simply be zero (which it will be since we initialized with 0)
+    st_plus_N_Qs = np.zeros(len(n_step_rewards))
+    st_plus_N_Qs[proper_next_states] = \
+        np.amax(self.model.predict_target(next_states[loop_untils[proper_next_states],:]), axis=1)
+    # adding together the discounted rewards for the next N steps and the 
+    q_updates = (n_step_rewards + st_plus_N_Qs)
+    old_Qs = self.model.predict_policy(states)
+    old_Qs_reduced = np.take_along_axis(old_Qs, actions[:,None], axis=1).reshape(-1)
+    TDs = np.abs(q_updates - old_Qs_reduced)
+    TDs += configs.CONST_E
+    priorities = (TDs ** configs.CONST_A) / (TDs ** configs.CONST_A).sum()
+    return priorities
+
+
 def get_priority(self):
     """
-    Only called when the model is fitted
     Compute priority values for prioritized replay
     :param self:
     :return:
@@ -290,14 +354,7 @@ def get_priority(self):
     temporal_differences = np.zeros(len(memory))
     for i in range(len(memory)):
         # get episode and state
-        episode, state = memory[i].round, memory[i].state
-
-        # translate action to int
-        action = ACTION_TRANSLATE[memory[i].action]
-
-        # starting states have no priority
-        if memory[i].state is None:
-            temporal_differences[i] = 0
+        episode, state, action = memory[i].round, memory[i].state, ACTION_TRANSLATE[memory[i].action]
 
         # get the reward of the N next steps, check that loop does not extend over length of memory
         loop_until = min(i + N, len(self.memory))  # prevent index out of range error
@@ -306,9 +363,9 @@ def get_priority(self):
         n_steps_reward = rewards.sum()
 
         # standard case: non-terminal state and model is fit
-        if self.memory[len(rewards) - 1].next_state is not None:
+        if self.memory[loop_until-1].next_state is not None:
             q_update = n_steps_reward + GAMMA ** N * \
-                       np.amax(self.model.predict_target(self.memory[len(rewards) - 1].next_state))
+                       np.amax(self.model.predict_target(self.memory[loop_until-1].next_state))
             q_values = self.model.predict_policy(state).reshape(-1)
 
         # if we have a terminal state in the next states we cannot predict q-values for the terminal state

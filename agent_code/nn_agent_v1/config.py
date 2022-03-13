@@ -29,7 +29,7 @@ configs = edict({
     "POLICY": "deterministic",
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
-    # determines the behavior of the states_to_features function: {"channels", "standard", "minimal"}
+    # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb"}
     "FEATURE_ENGINEERING": "channels",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
@@ -43,7 +43,7 @@ configs = edict({
     # how often to update the target network
     "UPDATE_FREQ": 10,
     # whether to load a model
-    "LOAD": True,
+    "LOAD": False,
     # where to load the model
     "LOAD_PATH": os.path.expanduser("~/bomberman_stats/11-03-2022-20-51_dnn-v1_1_0.9998_0.05_0.9_10_10000_256_deterministic_channels_huber_0.0001_True_10_model.pt"),
     # where to store and load the model,

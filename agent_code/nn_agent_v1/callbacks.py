@@ -148,6 +148,32 @@ def state_to_features(game_state: dict) -> np.array:
         return features[None,:]
 
 
+    if configs.FEATURE_ENGINEERING == "channels+bomb":
+
+        object_map = game_state["field"]
+
+        coin_map = np.zeros_like(game_state["field"])
+        for cx, cy in game_state["coins"]: coin_map[cx, cy] = 1
+
+        self_map = np.zeros_like(game_state["field"])
+        self_map[game_state["self"][3]] = 1
+
+        explosion_map = get_bomb_map(object_position=game_state["field"], bomb_list=game_state["bombs"],
+                                     explosion_position=game_state["explosion_map"])
+
+        # create channels based on the field and coin information.
+        channels = [object_map, self_map, coin_map, explosion_map]
+
+        # concatenate them as a feature tensor
+        stacked_channels = np.stack(channels)
+
+        # add bomb information
+        bomb_action_possible = game_state["self"][2]
+
+        # return the channels and whether bomb action is possible
+        return [stacked_channels[None,:], bomb_action_possible]
+
+
 # define simple node class used for BFS
 class Node(object):
     def __init__(self, position, parent_position, move, steps=None):

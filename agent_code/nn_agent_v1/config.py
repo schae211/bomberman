@@ -47,7 +47,9 @@ configs = edict({
     # where to load the model
     "LOAD_PATH": os.path.expanduser("~/bomberman_stats/NA"),
     # where to store and load the model,
-    "MODEL_LOC": os.path.expanduser("~/bomberman_stats")
+    "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
+    # including some comment
+    "COMMENT": "penalize waiting again, with pen=0, agent seems to learn to wait"
 })
 
 auxiliary_rewards = edict({
@@ -62,7 +64,7 @@ reward_specs = edict({
     "MOVED_UP": 0,
     "MOVED_DOWN": 0,
     "MOVED_LEFT": 0,
-    "WAITED": 0,
+    "WAITED": -0.5,
     "INVALID_ACTION": -2,
     "BOMB_DROPPED": 0,
     "BOMB_EXPLODED": 0,

@@ -49,7 +49,9 @@ configs = edict({
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
-    "COMMENT": "penalize waiting again, with pen=0, agent seems to learn to wait"
+    "COMMENT": "penalize waiting again, with pen=0, agent seems to learn to wait",
+    # include command line call
+    "CALL": "python main.py play --no-gui --n-rounds 500000 --agents nn_agent_v1 --train 1 --scenario crate_heaven"
 })
 
 auxiliary_rewards = edict({

@@ -6,7 +6,7 @@ import pandas as pd
 
 configs = edict({
     # which agent to use: {"MLP", "CNN"}
-    "AGENT": "CNN",
+    "AGENT": "MLP",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 0.8,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
@@ -20,23 +20,23 @@ configs = edict({
     # storing the last x transition as replay buffer fo r training
     "MEMORY_SIZE": 10_000,
     # how many transitions should be sampled from the memory to train the model
-    "SAMPLE_SIZE": 1024,
+    "SAMPLE_SIZE": 320,
     # should we exploit symmetries to augment the training data
     "TS_AUGMENTATION": False,
     # what batch size should be used to train the model
-    "BATCH_SIZE": 64,
+    "BATCH_SIZE": 32,
     # policy: {"deterministic", "stochastic"}
     "POLICY": "deterministic",
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb"}
-    "FEATURE_ENGINEERING": "channels",
+    "FEATURE_ENGINEERING": "standard",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
     "LEARNING_RATE": 0.0001,
     # should we use prioritized experience replay or sample the batches randomly
-    "PRIORITIZED_REPLAY": True,
+    "PRIORITIZED_REPLAY": False,
     # Parameters for prioritized experience replay:
     "CONST_E": 1,
     "CONST_A": 0.8,
@@ -49,14 +49,14 @@ configs = edict({
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
-    "COMMENT": "high risk test, to check whether CNN can learn the create field",
+    "COMMENT": "short check to see whether MLP can still learn anything",
     # include command line call
-    "CALL": "python main.py play --no-gui --n-rounds 500000 --agents nn_agent_v1 --train 1 --scenario crate_heaven"
+    "CALL": "python main.py play --no-gui --n-rounds 500000 --agents nn_agent_v1 --train 1 --scenario coin_heaven"
 })
 
 auxiliary_rewards = edict({
-    "MOVE_IN_CIRCLES": False,
-    "MOVE_TO_OR_FROM_COIN": False,
+    "MOVE_IN_CIRCLES": True,
+    "MOVE_TO_OR_FROM_COIN": True,
     "STAY_OR_ESCAPE_BOMB": False
 })
 
@@ -79,9 +79,9 @@ reward_specs = edict({
     "OPPONENT_ELIMINATED": 0,
     "SURVIVED_ROUND": 0,
     # auxiliary events to reward shaping
-    "MOVE_TO_COIN": 0,
-    "MOVE_FROM_COIN": 0,
-    "MOVE_IN_CIRCLES": 0,
+    "MOVE_TO_COIN": 1,
+    "MOVE_FROM_COIN": -1,
+    "MOVE_IN_CIRCLES": -1,
     "STAY_IN_BOMB": 0,
     "ESCAPE_FROM_BOMB": 0
 })

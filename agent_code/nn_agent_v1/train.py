@@ -114,16 +114,15 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     if last_game_state["round"] % configs.UPDATE_FREQ == 0:
         self.model.update_target()
 
-    priorities, states, updated_Qs = compute_priority(self)
-
     if configs.PRIORITIZED_REPLAY:
+        priorities, states, updated_Qs = compute_priority(self)
         batch = np.random.choice(a=np.arange(0, len(self.memory)), size=min(configs.SAMPLE_SIZE, len(self.memory)),
                                  replace=False, p=priorities)
+        X, y = states[batch, :], updated_Qs[batch, :]
     else:
         batch = np.random.choice(a=np.arange(0, len(self.memory)), size=min(configs.SAMPLE_SIZE, len(self.memory)),
                                  replace=False)
-
-    X, y = states[batch,:], updated_Qs[batch,:]
+        X, y = compute_TS(self, batch)
 
     if configs.TS_AUGMENTATION:
         X, y = get_augmented_TS(configs.FEATURE_ENGINEERING, X, y)
@@ -203,10 +202,10 @@ def prep_memory(self):
         rewards[i] = self.memory[i].reward
         states[i] = memory[i].state
 
-        if memory[i].next_state is None: proper_next_states[i] = False  # if next_state is terminal state,
-        else: next_states[i] = memory[i].next_state                     # we will just keep all the values zero!
-                                                                        # (and take note of it in proper_next_states)
-
+        if memory[i].next_state is None:
+            proper_next_states[i] = False
+        else:                                           # if next_state is terminal state, we will just keep all
+            next_states[i] = memory[i].next_state       # the values zero! (and take note of it in proper_next_states)
     return episodes, states, actions, next_states, proper_next_states, rewards
 
 
@@ -220,19 +219,15 @@ def compute_n_step_reward(episodes, rewards, N, GAMMA):
     """
     gammas = np.repeat(GAMMA, N)**(np.arange(N))            # gammas already taken to the power of the step
     n_step_rewards = np.zeros(len(episodes))                # initialize array to store the n_step rewards
-    loop_untils = np.minimum(np.arange(len(episodes))+N,    # making sure to prevent index out of range errors
-                             len(episodes))
+    loop_untils = np.empty(len(episodes))
+    for i in range(len(loop_untils)):                       # making sure to prevent index out of range errors and looping into the next episode
+        loop_untils[i] = max([t for t in range(min(i+N+1, len(episodes))) if episodes[t] == episodes[i]])  # so t can maximally be i+N or len(episodes)-1
     for i in range(len(n_step_rewards)):                    # looping through each step
-
-        # get the reward of the N next steps, check that we do not include steps from the next episode
         r = np.zeros(N)
         for idx, t in enumerate(range(i, loop_untils[i])):
-            if episodes[t] == episodes[i]:
-                r[idx] = rewards[t]
-
+            r[idx] = rewards[t]
         r *= gammas
         n_step_rewards[i] = r.sum()
-
     return n_step_rewards, loop_untils
 
 
@@ -240,7 +235,7 @@ def compute_priority(self):
     episodes, states, actions, next_states, proper_next_states, rewards = prep_memory(self)
     # n_step rewards contains the sum of the discounted rewards of the 10 next steps
     n_step_rewards, loop_untils = compute_n_step_reward(episodes, rewards, configs.N_STEPS, configs.GAMMA)
-    # st_plus_N_Qs contains the maximum action-value for the state s_(t+N) if this state exists, otherwise is should simply be zero (which it will be since we initialized with 0)
+    # st_plus_N_Qs contains the maximum action-value for the state s_(t+N) if this state exists, otherwise it should simply be zero (which it will be since we initialized with 0)
     st_plus_N_Qs = np.zeros(len(n_step_rewards))
     st_plus_N_Qs[proper_next_states] = \
         np.amax(self.model.predict_target(next_states[(loop_untils-1)[proper_next_states],:]), axis=1)
@@ -261,6 +256,38 @@ def compute_priority(self):
     # computing the probabilities/priorities from the TD errors
     priorities = (TDs ** configs.CONST_A) / (TDs ** configs.CONST_A).sum()
     return priorities, states, updated_Qs
+
+
+# computing the training sets using the old way since we supposedly have some bugs in the other version
+def compute_TS(self, batch):
+    X = np.zeros([len(batch)] + feature_specs[configs.FEATURE_ENGINEERING].shape)
+    y = np.zeros([len(batch)] + [6])
+
+    # extract information from each transition tuple (as stored above)
+    for ts_index, i in enumerate(batch):
+        # get episode and state, translate action to integer
+        episode, state, action = self.memory[i].round, self.memory[i].state, ACTION_TRANSLATE[self.memory[i].action]
+
+        # check that we loop only over the current episode and also not further than the length of our memory
+        loop_until = max(t for t in range(min(i+configs.N_STEPS+1, len(self.memory))) if self.memory[t].round == episode)  # t can maximally be i+N or len(self.memory)-1
+        rewards = [self.memory[t].reward for t in range(i, loop_until)] # get the reward of the N next steps
+        gammas = [configs.GAMMA ** t for t in range(0, len(rewards))]   # compute discounted gammas
+        n_steps_reward = (np.array(rewards) * np.array(gammas)).sum()   # elementwise multiplication with gammas and summation
+
+        # standard case: non-terminal state and model is fit
+        if self.memory[loop_until].next_state is not None:
+            q_update = n_steps_reward + configs.GAMMA ** configs.N_STEPS * \
+                       np.amax(self.model.predict_target(self.memory[loop_until].next_state))
+        # we cannot predict q-values for the terminal state (which is none)
+        else:
+            q_update = n_steps_reward
+
+        q_values = self.model.predict_policy(state).reshape(-1)  # use policy network to predict all q-values
+        q_values[action] = q_update                              # replace the q-value of the action that was actually taken
+
+        X[ts_index,:], y[ts_index,:] = state, q_values
+
+    return X, y
 
 
 def get_augmented_TS(FEAT_ENG, TS_X, TS_y):

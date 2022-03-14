@@ -237,8 +237,9 @@ def compute_priority(self):
     n_step_rewards, loop_untils = compute_n_step_reward(episodes, rewards, configs.N_STEPS, configs.GAMMA)
     # st_plus_N_Qs contains the maximum action-value for the state s_(t+N) if this state exists, otherwise it should simply be zero (which it will be since we initialized with 0)
     st_plus_N_Qs = np.zeros(len(n_step_rewards))
-    st_plus_N_Qs[proper_next_states] = \
-        np.amax(self.model.predict_target(next_states[(loop_untils-1)[proper_next_states],:]), axis=1)
+    # check whether the corresponding next state for a loop until index is present ("proper") meaning not None
+    st_plus_N_Qs[proper_next_states[loop_untils.astype(np.int16)]] = \
+        np.amax(self.model.predict_target(next_states[proper_next_states[loop_untils.astype(np.int16)],:]), axis=1)
     # adding together the discounted rewards for the next N steps and the maximum action-value of the state s_(t+N)
     q_updates = (n_step_rewards + st_plus_N_Qs)
     # predicting the original action-values for the state s_t

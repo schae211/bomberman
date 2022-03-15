@@ -6,9 +6,9 @@ import pandas as pd
 
 configs = edict({
     # which agent to use: {"MLP", "CNN", "CNNPlus"}
-    "AGENT": "CNNPlus",
+    "AGENT": "CNN",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
-    "EPSILON": 0.15,
+    "EPSILON": 0.4,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
     "EPSILON_DECAY": 0.9998,
     # epsilon-greedy strategy minimum epsilon: epsilon := max(0.05, epsilon * decay^(#episode))
@@ -20,17 +20,17 @@ configs = edict({
     # storing the last x transition as replay buffer fo r training
     "MEMORY_SIZE": 10_000,
     # how many transitions should be sampled from the memory to train the model
-    "SAMPLE_SIZE": 640,
+    "SAMPLE_SIZE": 1280,
     # should we exploit symmetries to augment the training data
     "TS_AUGMENTATION": False,
     # what batch size should be used to train the model
-    "BATCH_SIZE": 32,
+    "BATCH_SIZE": 128,
     # policy: {"deterministic", "stochastic"}
     "POLICY": "deterministic",
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb"}
-    "FEATURE_ENGINEERING": "channels+bomb",
+    "FEATURE_ENGINEERING": "channels",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
@@ -49,9 +49,9 @@ configs = edict({
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
-    "COMMENT": "testing",
+    "COMMENT": "testing whether CNN can still learn to play on coin heaven",
     # include command line call
-    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario crate_heaven --train 1 --no-gui",
+    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario coin_heaven --train 1 --no-gui",
     # use other agent to guide the first x episodes (our pretrain method)
     "PRETRAIN": False,
     # number of episodes to use pretraining
@@ -64,7 +64,7 @@ configs = edict({
 
 auxiliary_rewards = edict({
     "MOVE_IN_CIRCLES": False,
-    "MOVE_TO_OR_FROM_COIN": False,
+    "MOVE_TO_OR_FROM_COIN": True,
     "STAY_OR_ESCAPE_BOMB": False
 })
 
@@ -90,8 +90,8 @@ reward_specs = edict({
     "MOVE_TO_COIN": 1,
     "MOVE_FROM_COIN": -1,
     "MOVE_IN_CIRCLES": -1,
-    "STAY_IN_BOMB": 0,
-    "ESCAPE_FROM_BOMB": 0
+    "STAY_IN_BOMB": -1,
+    "ESCAPE_FROM_BOMB": 1
 })
 
 # needed for generating the right shapes

@@ -2,6 +2,7 @@ import os
 import numpy as np
 from agent_code.nn_agent_v2.dnn_model import DoubleNNModel
 from agent_code.nn_agent_v2.cnn_model import DoubleCNNModel
+from agent_code.nn_agent_v2.cnn_plus_model import DoubleCNNPlusModel
 from agent_code.nn_agent_v2.pretrained_model import PretrainedModel
 from agent_code.nn_agent_v2.config import configs
 
@@ -27,6 +28,7 @@ def setup(self):
     """
     if configs.AGENT == "MLP": self.model = DoubleNNModel()
     if configs.AGENT == "CNN": self.model = DoubleCNNModel()
+    if configs.AGENT == "CNNPlus": self.model = DoubleCNNPlusModel()
     if configs.PRETRAIN: self.pretrained_model = PretrainedModel()
 
 
@@ -116,7 +118,7 @@ def state_to_features(game_state: dict) -> np.array:
         # and return them as a vector
         return stacked_channels[None,:]
 
-    elif configs.FEATURE_ENGINEERING == "standard":
+    if configs.FEATURE_ENGINEERING == "standard":
 
         # 1. 1D array, len = 4: indicating in which directions the agent can move (up, right, down, left)
         awareness = get_awareness(object_position=game_state["field"], self_position=game_state["self"][3])
@@ -177,17 +179,18 @@ def state_to_features(game_state: dict) -> np.array:
         other_agents = np.zeros_like(game_state["field"])
         for (_, _, _, (cx, cy)) in game_state["others"]: other_agents[cx, cy] = 1
 
+        # channel for additional features
+        additional_info = np.zeros_like(game_state["field"])
+        additional_info[0,0] = game_state["self"][2]    # add bomb info
+
         # create channels based on the field and coin information.
-        channels = [object_map, self_map, coin_map, explosion_map, other_agents]
+        channels = [object_map, self_map, coin_map, explosion_map, other_agents, additional_info]
 
         # concatenate them as a feature tensor
         stacked_channels = np.stack(channels)
 
-        # add bomb information
-        bomb_action_possible = game_state["self"][2]
-
         # return the channels and whether bomb action is possible
-        return [stacked_channels[None,:], bomb_action_possible]
+        return stacked_channels[None,:]
 
 
 def state_to_features_pretrain(game_state: dict) -> np.array:
@@ -233,7 +236,7 @@ def state_to_features_pretrain(game_state: dict) -> np.array:
         # and return them as a vector
         return stacked_channels[None,:]
 
-    elif configs.PRETRAIN_FEATURES == "standard":
+    if configs.PRETRAIN_FEATURES == "standard":
 
         # 1. 1D array, len = 4: indicating in which directions the agent can move (up, right, down, left)
         awareness = get_awareness(object_position=game_state["field"], self_position=game_state["self"][3])
@@ -278,7 +281,7 @@ def state_to_features_pretrain(game_state: dict) -> np.array:
         return features[None,:]
 
 
-    if configs.PRETRAIN_FEATURES == "channels+bomb":
+    if configs.FEATURE_ENGINEERING == "channels+bomb":
 
         object_map = game_state["field"]
 
@@ -294,17 +297,18 @@ def state_to_features_pretrain(game_state: dict) -> np.array:
         other_agents = np.zeros_like(game_state["field"])
         for (_, _, _, (cx, cy)) in game_state["others"]: other_agents[cx, cy] = 1
 
+        # channel for additional features
+        additional_info = np.zeros_like(game_state["field"])
+        additional_info[0,0] = game_state["self"][2]    # add bomb info
+
         # create channels based on the field and coin information.
-        channels = [object_map, self_map, coin_map, explosion_map, other_agents]
+        channels = [object_map, self_map, coin_map, explosion_map, other_agents, additional_info]
 
         # concatenate them as a feature tensor
         stacked_channels = np.stack(channels)
 
-        # add bomb information
-        bomb_action_possible = game_state["self"][2]
-
         # return the channels and whether bomb action is possible
-        return [stacked_channels[None,:], bomb_action_possible]
+        return stacked_channels[None,:]
 
 
 # define simple node class used for BFS

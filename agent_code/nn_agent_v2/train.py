@@ -209,6 +209,7 @@ def prep_memory(self):
     return episodes, states, actions, next_states, proper_next_states, rewards
 
 
+
 @jit(nopython=True)
 def compute_n_step_reward(episodes, rewards, N, GAMMA):
     """

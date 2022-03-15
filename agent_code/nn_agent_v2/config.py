@@ -5,8 +5,8 @@ import os
 import pandas as pd
 
 configs = edict({
-    # which agent to use: {"MLP", "CNN"}
-    "AGENT": "CNN",
+    # which agent to use: {"MLP", "CNN", "CNNPlus"}
+    "AGENT": "CNNPlus",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 0.15,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
@@ -30,7 +30,7 @@ configs = edict({
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb"}
-    "FEATURE_ENGINEERING": "channels",
+    "FEATURE_ENGINEERING": "channels+bomb",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
@@ -49,11 +49,11 @@ configs = edict({
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
-    "COMMENT": "testing whether pretraining works better with lower epsilon",
+    "COMMENT": "testing",
     # include command line call
-    "CALL": "play --n-rounds 500000 --agents nn_agent_v2 --scenario crate_heaven --train 1 --no-gui",
+    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario crate_heaven --train 1 --no-gui",
     # use other agent to guide the first x episodes (our pretrain method)
-    "PRETRAIN": True,
+    "PRETRAIN": False,
     # number of episodes to use pretraining
     "PRETRAIN_LEN": 10_000,
     # location of the save pretrain agent model
@@ -101,6 +101,9 @@ feature_specs = edict({
     }),
     "standard": edict({
         "shape": [30]
+    }),
+    "channels+bomb": edict({
+        "shape": [6, 17, 17]
     })
 })
 

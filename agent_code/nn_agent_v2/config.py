@@ -8,7 +8,7 @@ configs = edict({
     # which agent to use: {"MLP", "CNN"}
     "AGENT": "CNN",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
-    "EPSILON": 1,
+    "EPSILON": 0.15,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
     "EPSILON_DECAY": 0.9998,
     # epsilon-greedy strategy minimum epsilon: epsilon := max(0.05, epsilon * decay^(#episode))
@@ -49,7 +49,7 @@ configs = edict({
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
-    "COMMENT": "testing how pretraining works in the long run",
+    "COMMENT": "testing whether pretraining works better with lower epsilon",
     # include command line call
     "CALL": "play --n-rounds 500000 --agents nn_agent_v2 --scenario crate_heaven --train 1 --no-gui",
     # use other agent to guide the first x episodes (our pretrain method)

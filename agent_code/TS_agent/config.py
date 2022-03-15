@@ -6,7 +6,7 @@ import pandas as pd
 
 configs = edict({
     # which agent to use: {"MLP", "CNN"}
-    "AGENT": "CNN",
+    "AGENT": "MLP",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 1,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
@@ -30,7 +30,7 @@ configs = edict({
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb"}
-    "FEATURE_ENGINEERING": "channels",
+    "FEATURE_ENGINEERING": "standard",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
@@ -49,17 +49,9 @@ configs = edict({
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
-    "COMMENT": "testing",
+    "COMMENT": "mlp on mac, destroying creates, no aux rewards",
     # include command line call
-    "CALL": "python main.py play --no-gui --n-rounds 500000 --agents nn_agent_v2 --train 1 --scenario crate_heaven",
-    # use other agent to guide the first x episodes (our pretrain method)
-    "PRETRAIN": True,
-    # number of episodes to use pretraining
-    "PRETRAIN_LEN": 20_000,
-    # location of the save pretrain agent model
-    "PRETRAIN_LOC":  os.path.expanduser("~/bomberman_stats/15-03-2022-07-13_MLP_0.8_0.9998_0.01_0.9_6_10000_32_deterministic_standard_huber_0.0001_True_10_model.pt"),
-    # pretrain feature engineering: {"channels", "standard", "channels+bomb"}
-    "PRETRAIN_FEATURES": "standard"
+    "CALL": "python main.py play --no-gui --n-rounds 500000 --agents nn_agent_v1 --train 1 --scenario crate_heaven"
 })
 
 auxiliary_rewards = edict({

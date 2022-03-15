@@ -6,8 +6,8 @@ import pandas as pd
 from numba import jit
 
 import events as e
-from agent_code.nn_agent_v2.callbacks import state_to_features, coin_bfs, save_bfs, get_bomb_map
-from agent_code.nn_agent_v2.config import configs, feature_specs, reward_specs, auxiliary_rewards, SAVE_KEY, SAVE_TIME
+from agent_code.nn_agent_v1.callbacks import state_to_features, coin_bfs, save_bfs, get_bomb_map
+from agent_code.nn_agent_v1.config import configs, feature_specs, reward_specs, auxiliary_rewards, SAVE_KEY, SAVE_TIME
 
 Transition = namedtuple("Transition", ("round", "state", "action", "next_state", "reward"))
 

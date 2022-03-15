@@ -3,18 +3,15 @@ import torch.nn as nn
 
 from torch.utils.data import DataLoader, Dataset
 import numpy as np
-from agent_code.nn_agent_v1.config import configs, SAVE_KEY, SAVE_TIME
+from agent_code.nn_agent_v2.config import configs, SAVE_KEY, SAVE_TIME
 
-
-# Hyperparameters
+# Which loss function should be used
 if configs.LOSS == "huber": LOSS_FUNCTION = nn.HuberLoss()
 if configs.LOSS == "mse": LOSS_FUNCTION = nn.MSELoss()
 
-
-# Set device
+# Set device (either cpu or cuda)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
-
 
 class DoubleCNNModel(nn.Module):
     """

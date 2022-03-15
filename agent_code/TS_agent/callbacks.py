@@ -1,9 +1,8 @@
 import os
 import numpy as np
-from agent_code.nn_agent_v2.dnn_model import DoubleNNModel
-from agent_code.nn_agent_v2.cnn_model import DoubleCNNModel
-from agent_code.nn_agent_v2.pretrained_model import PretrainedModel
-from agent_code.nn_agent_v2.config import configs
+from agent_code.nn_agent_v1.dnn_model import DoubleNNModel
+from agent_code.nn_agent_v1.cnn_model import DoubleCNNModel
+from agent_code.nn_agent_v1.config import configs
 
 # helper lists and dictionaries for actions
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
@@ -25,9 +24,15 @@ def setup(self):
 
     :param self: This object is passed to all callbacks and you can set arbitrary values.
     """
-    if configs.AGENT == "MLP": self.model = DoubleNNModel()
-    if configs.AGENT == "CNN": self.model = DoubleCNNModel()
-    if configs.PRETRAIN: self.pretrained_model = PretrainedModel()
+    if self.train or not os.path.isfile("my-saved-model.pt"):
+        self.logger.info("Setting up model from scratch.")
+        # unfortunately match statements are not available in python 3.9 yet
+        if configs.AGENT == "MLP": self.model = DoubleNNModel()
+        if configs.AGENT == "CNN": self.model = DoubleCNNModel()
+    else:
+        self.logger.info("Loading model from saved state.")
+        if configs.AGENT == "MLP": self.model = DoubleNNModel()
+        if configs.AGENT == "CNN": self.model = DoubleCNNModel()
 
 
 def act(self, game_state: dict) -> str:
@@ -42,19 +47,7 @@ def act(self, game_state: dict) -> str:
 
     # only do exploration if we train, no random moves in tournament + reduce exploration in later episodes/games
     episode_n = 0 if game_state is None else game_state["round"]
-
-    # configure pretrain
-    if configs.PRETRAIN and episode_n <= configs.PRETRAIN_LEN:
-        self.logger.debug("Pretrained agent is playing")
-        features = state_to_features_pretrain(game_state)
-        q_values = self.pretrained_model.predict(features).reshape(-1)
-        if configs.POLICY == "deterministic":
-            return ACTION_TRANSLATE_REV[np.argmax(q_values)]
-        elif configs.POLICY == "stochastic":
-            return np.random.choice(ACTIONS, p=(np.exp(q_values) / np.sum(np.exp(q_values))))
-
-    # reduce exploration over time, account for pretraining ("episode_n-configs.PRETRAIN_LEN")
-    if self.train and np.random.rand() <= max(self.epsilon_min, self.epsilon * self.epsilon_reduction ** episode_n-configs.PRETRAIN_LEN):
+    if self.train and np.random.rand() <= max(self.epsilon_min, self.epsilon * self.epsilon_reduction ** episode_n):
         self.logger.debug("Choosing action at random due to epsilon-greedy policy")
         action = np.random.choice(ACTIONS, p=configs.DEFAULT_PROBS)
         return action
@@ -146,6 +139,8 @@ def state_to_features(game_state: dict) -> np.array:
         bomb_info = get_bomb_info(object_position=game_state["field"], explosion_map=explosion_map,
                                   self=game_state["self"], bomb_list=game_state["bombs"])
 
+        # TODO: Add other agents information, to aid attacking them
+        #   Add feature vector with len 5 indicating whether target was acquired and in which direction
         others_direction = get_others_direction(object_position=game_state["field"], bomb_list=game_state["bombs"],
                                                 self_position=game_state["self"][3], explosion_map=explosion_map,
                                                 others=game_state["others"])
@@ -162,123 +157,6 @@ def state_to_features(game_state: dict) -> np.array:
 
 
     if configs.FEATURE_ENGINEERING == "channels+bomb":
-
-        object_map = game_state["field"]
-
-        coin_map = np.zeros_like(game_state["field"])
-        for cx, cy in game_state["coins"]: coin_map[cx, cy] = 1
-
-        self_map = np.zeros_like(game_state["field"])
-        self_map[game_state["self"][3]] = 1
-
-        explosion_map = get_bomb_map(object_position=game_state["field"], bomb_list=game_state["bombs"],
-                                     explosion_position=game_state["explosion_map"])
-
-        other_agents = np.zeros_like(game_state["field"])
-        for (_, _, _, (cx, cy)) in game_state["others"]: other_agents[cx, cy] = 1
-
-        # create channels based on the field and coin information.
-        channels = [object_map, self_map, coin_map, explosion_map, other_agents]
-
-        # concatenate them as a feature tensor
-        stacked_channels = np.stack(channels)
-
-        # add bomb information
-        bomb_action_possible = game_state["self"][2]
-
-        # return the channels and whether bomb action is possible
-        return [stacked_channels[None,:], bomb_action_possible]
-
-
-def state_to_features_pretrain(game_state: dict) -> np.array:
-    """
-    *This is not a required function, but an idea to structure your code.*
-
-    Converts the game state to the input of your model, i.e.
-    a feature vector.
-
-    You can find out about the state of the game environment via game_state,
-    which is a dictionary. Consult 'get_state_for_agent' in environment.py to see
-    what it contains.
-
-    :param game_state:  A dictionary describing the current game board.
-    :return: np.array
-    """
-    # This is the game_state dict before the game begins and after it ends, so features cannot be extracted
-    if game_state is None:
-        return None
-
-    if configs.PRETRAIN_FEATURES == "channels":
-
-        object_map = game_state["field"]
-
-        coin_map = np.zeros_like(game_state["field"])
-        for cx, cy in game_state["coins"]: coin_map[cx, cy] = 1
-
-        self_map = np.zeros_like(game_state["field"])
-        self_map[game_state["self"][3]] = 1
-
-        explosion_map = get_bomb_map(object_position=game_state["field"], bomb_list=game_state["bombs"],
-                                     explosion_position=game_state["explosion_map"])
-
-        other_agents = np.zeros_like(game_state["field"])
-        for (_, _, _, (cx, cy)) in game_state["others"]: other_agents[cx, cy] = 1
-
-        # create channels based on the field and coin information.
-        channels = [object_map, self_map, coin_map, explosion_map, other_agents]
-
-        # concatenate them as a feature tensor
-        stacked_channels = np.stack(channels)
-
-        # and return them as a vector
-        return stacked_channels[None,:]
-
-    elif configs.PRETRAIN_FEATURES == "standard":
-
-        # 1. 1D array, len = 4: indicating in which directions the agent can move (up, right, down, left)
-        awareness = get_awareness(object_position=game_state["field"], self_position=game_state["self"][3])
-
-        # 2. 1D array, len = 4:  indicating in which direction lays the closest coin determined by BFS (up, right, down, left)
-        coin_direction = get_coin_direction(object_position=game_state["field"], coin_list=game_state["coins"],
-                                            self_position=game_state["self"][3])
-
-        # 2D array indicating which area is affected by exploded bombs or by bombs which are about to explode
-        explosion_map = get_bomb_map(object_position=game_state["field"], bomb_list=game_state["bombs"],
-                                     explosion_position=game_state["explosion_map"])
-
-        # 3. 1D array, len = 5:  indicating how dangerous the current field, up, right, down, left are
-        danger = get_danger(explosion_map=explosion_map, self_position=game_state["self"][3])
-
-        # 4. 1D array, len = 5:  indicating in which direction to flee from bomb if immediate danger (current, up, right, down, left),
-        # if no immediate danger/current spot is safe returns all zeros, otherwise direction
-        safe_direction = get_safe_direction(object_position=game_state["field"], explosion_map=explosion_map,
-                                            self_position=game_state["self"][3])
-
-        # 5. 1D array, len = 5:  indicating in which direction lays the most lucrative position for laying a bomb
-        # that destroys most crates penalized by the distance as determined by BFS (up, right, down, left)
-        crate_direction = get_crate_direction(object_position=game_state["field"], bomb_list=game_state["bombs"],
-                                              self_position=game_state["self"][3], explosion_map=explosion_map)
-
-        # 6. 1D array, len = 2: indicating whether bomb can be dropped and survival is possible
-        bomb_info = get_bomb_info(object_position=game_state["field"], explosion_map=explosion_map,
-                                  self=game_state["self"], bomb_list=game_state["bombs"])
-
-        others_direction = get_others_direction(object_position=game_state["field"], bomb_list=game_state["bombs"],
-                                                self_position=game_state["self"][3], explosion_map=explosion_map,
-                                                others=game_state["others"])
-
-        features = np.concatenate([awareness,
-                                   danger,
-                                   safe_direction,
-                                   coin_direction,
-                                   crate_direction,
-                                   bomb_info,
-                                   others_direction])
-
-        return features[None,:]
-
-
-    if configs.PRETRAIN_FEATURES == "channels+bomb":
 
         object_map = game_state["field"]
 

@@ -47,13 +47,17 @@ def act(self, game_state: dict) -> str:
 
     # configure pretrain
     if configs.PRETRAIN and episode_n <= configs.PRETRAIN_LEN:
-        self.logger.debug("Pretrained agent is playing")
-        features = state_to_features_pretrain(game_state)
-        q_values = self.pretrained_model.predict(features).reshape(-1)
-        if configs.POLICY == "deterministic":
-            return ACTION_TRANSLATE_REV[np.argmax(q_values)]
-        elif configs.POLICY == "stochastic":
-            return np.random.choice(ACTIONS, p=(np.exp(q_values) / np.sum(np.exp(q_values))))
+        if np.random.rand() <= configs.PRETRAIN_RANDOM:
+            self.logger.debug("Pretrained agent is playing random")
+            return np.random.choice(ACTIONS, p=configs.DEFAULT_PROBS)
+        else:
+            self.logger.debug("Pretrained agent is playing deterministic")
+            features = state_to_features_pretrain(game_state)
+            q_values = self.pretrained_model.predict(features).reshape(-1)
+            if configs.POLICY == "deterministic":
+                return ACTION_TRANSLATE_REV[np.argmax(q_values)]
+            elif configs.POLICY == "stochastic":
+                return np.random.choice(ACTIONS, p=(np.exp(q_values) / np.sum(np.exp(q_values))))
 
     # reduce exploration over time, account for pretraining ("episode_n-configs.PRETRAIN_LEN")
     if self.train and np.random.rand() <= max(self.epsilon_min, self.epsilon * self.epsilon_reduction ** episode_n-configs.PRETRAIN_LEN):

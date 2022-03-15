@@ -6,17 +6,17 @@ import pandas as pd
 
 configs = edict({
     # which agent to use: {"MLP", "CNN", "CNNPlus"}
-    "AGENT": "CNN",
+    "AGENT": "CNNPlus",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
-    "EPSILON": 0.4,
+    "EPSILON": 0.5,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
     "EPSILON_DECAY": 0.9998,
     # epsilon-greedy strategy minimum epsilon: epsilon := max(0.05, epsilon * decay^(#episode))
     "EPSILON_MIN": 0.05,
     # discount factor gamma, which discount future rewards
-    "GAMMA": 0.95,
+    "GAMMA": 0.9,
     # N-step temporal difference learning parameter, how many steps to look ahead for computing q-value updates
-    "N_STEPS": 6,
+    "N_STEPS": 2,
     # storing the last x transition as replay buffer fo r training
     "MEMORY_SIZE": 10_000,
     # how many transitions should be sampled from the memory to train the model
@@ -30,7 +30,7 @@ configs = edict({
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb"}
-    "FEATURE_ENGINEERING": "channels",
+    "FEATURE_ENGINEERING": "channels+bomb",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
@@ -49,22 +49,24 @@ configs = edict({
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
-    "COMMENT": "testing whether CNN can still learn to play on coin heaven",
+    "COMMENT": "testing whether CNN with bomb information works better in create scenario with pretraining",
     # include command line call
-    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario coin_heaven --train 1 --no-gui",
+    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario crate_heaven --train 1 --no-gui",
     # use other agent to guide the first x episodes (our pretrain method)
-    "PRETRAIN": False,
+    "PRETRAIN": True,
     # number of episodes to use pretraining
-    "PRETRAIN_LEN": 10_000,
+    "PRETRAIN_LEN": 20_000,
     # location of the save pretrain agent model
     "PRETRAIN_LOC":  os.path.expanduser("~/bomberman_stats/15-03-2022-07-13_MLP_0.8_0.9998_0.01_0.9_6_10000_32_deterministic_standard_huber_0.0001_True_10_model.pt"),
     # pretrain feature engineering: {"channels", "standard", "channels+bomb"}
-    "PRETRAIN_FEATURES": "standard"
+    "PRETRAIN_FEATURES": "standard",
+    # fraction of random moves performed by pretrained agent (so no perfect performance)
+    "PRETRAIN_RANDOM": 0.3
 })
 
 auxiliary_rewards = edict({
     "MOVE_IN_CIRCLES": False,
-    "MOVE_TO_OR_FROM_COIN": True,
+    "MOVE_TO_OR_FROM_COIN": False,
     "STAY_OR_ESCAPE_BOMB": False
 })
 

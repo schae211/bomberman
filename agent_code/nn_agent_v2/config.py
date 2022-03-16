@@ -51,11 +51,11 @@ configs = edict({
     # including some comment
     "COMMENT": "fixed bug in TS engineering, regarding last reward",
     # include command line call
-    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario coin_heaven --train 1 --no-gui",
+    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario create_heaven --train 1 --no-gui",
     # use other agent to guide the first x episodes (our pretrain method)
     "PRETRAIN": False,
     # number of episodes to use pretraining
-    "PRETRAIN_LEN": 20_000,
+    "PRETRAIN_LEN": 0,
     # location of the save pretrain agent model
     "PRETRAIN_LOC":  os.path.expanduser("~/bomberman_stats/15-03-2022-07-13_MLP_0.8_0.9998_0.01_0.9_6_10000_32_deterministic_standard_huber_0.0001_True_10_model.pt"),
     # pretrain feature engineering: {"channels", "standard", "channels+bomb"}

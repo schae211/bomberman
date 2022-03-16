@@ -27,7 +27,7 @@ class DoubleNNModel(nn.Module):
                                     map_location=torch.device(device))  # map_location=torch.device("cpu"))
             self.target_net = torch.load(configs.LOAD_PATH,
                                     map_location=torch.device(device))  # map_location=torch.device("cpu"))
-            self.target_net.load_state_dict(self.policy_net.state_dict())
+            self.optimizer = torch.optim.AdamW(self.policy_net.parameters(), lr=configs.LEARNING_RATE)
             self.target_net.eval()
         else:
             print("INITIALIZE MODEL")

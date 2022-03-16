@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from torch.utils.data import DataLoader, Dataset
 import numpy as np
-from agent_code.nn_agent_v2.config import configs, SAVE_KEY, SAVE_TIME
+from agent_code.nn_agent_v2.config import configs, SAVE_KEY, SAVE_TIME, feature_specs
 
 # Which loss function should be used
 if configs.LOSS == "huber": LOSS_FUNCTION = nn.HuberLoss()
@@ -31,8 +31,8 @@ class DoubleCNNModel(nn.Module):
             self.target_net.eval()
         else:
             print("INITIALIZE MODEL")
-            self.policy_net = CNN(input_channel=5)
-            self.target_net = CNN(input_channel=5)
+            self.policy_net = CNN(input_channel=feature_specs.channels_reduced.shape[0])
+            self.target_net = CNN(input_channel=feature_specs.channels_reduced.shape[0])
             self.target_net.load_state_dict(self.policy_net.state_dict())
             self.optimizer = torch.optim.AdamW(self.policy_net.parameters(), lr=configs.LEARNING_RATE)
         self.policy_net.to(device)

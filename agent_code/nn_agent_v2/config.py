@@ -5,18 +5,18 @@ import os
 import pandas as pd
 
 configs = edict({
-    # which agent to use: {"MLP", "CNN", "CNNPlus"}
-    "AGENT": "CNNPlus",
+    # which agent to use: {"MLP", "CNN", "CNNPlus", "channels_reduced"}
+    "AGENT": "MLP",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
-    "EPSILON": 0.5,
+    "EPSILON": 1,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
-    "EPSILON_DECAY": 0.9998,
+    "EPSILON_DECAY": 0.999,
     # epsilon-greedy strategy minimum epsilon: epsilon := max(0.05, epsilon * decay^(#episode))
     "EPSILON_MIN": 0.05,
     # discount factor gamma, which discount future rewards
     "GAMMA": 0.9,
     # N-step temporal difference learning parameter, how many steps to look ahead for computing q-value updates
-    "N_STEPS": 2,
+    "N_STEPS": 10,
     # storing the last x transition as replay buffer fo r training
     "MEMORY_SIZE": 10_000,
     # how many transitions should be sampled from the memory to train the model
@@ -29,8 +29,8 @@ configs = edict({
     "POLICY": "deterministic",
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
-    # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb"}
-    "FEATURE_ENGINEERING": "channels+bomb",
+    # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb", "channels_reduced}
+    "FEATURE_ENGINEERING": "channels_reduced",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
@@ -45,15 +45,15 @@ configs = edict({
     # whether to load a model
     "LOAD": False,
     # where to load the model
-    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/NA"),
+    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/15-03-2022-07-13_MLP_0.8_0.9998_0.01_0.9_6_10000_32_deterministic_standard_huber_0.0001_True_10_model.pt"),
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
-    "COMMENT": "testing whether CNN with bomb information works better in create scenario with pretraining",
+    "COMMENT": "testing whether CNN with 4 channels can still learn coin heaven",
     # include command line call
-    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario crate_heaven --train 1 --no-gui",
+    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario coin_heaven --train 1 --no-gui",
     # use other agent to guide the first x episodes (our pretrain method)
-    "PRETRAIN": True,
+    "PRETRAIN": False,
     # number of episodes to use pretraining
     "PRETRAIN_LEN": 20_000,
     # location of the save pretrain agent model
@@ -80,8 +80,8 @@ reward_specs = edict({
     "INVALID_ACTION": -2,
     "BOMB_DROPPED": 0,
     "BOMB_EXPLODED": 0,
-    "CRATE_DESTROYED": 2,
-    "COIN_FOUND": 2,
+    "CRATE_DESTROYED": 1,
+    "COIN_FOUND": 0,
     "COIN_COLLECTED": 5,
     "KILLED_OPPONENT": 25,
     "KILLED_SELF": 0,  # setting to 0 because also included in GOT_KILLED
@@ -106,6 +106,9 @@ feature_specs = edict({
     }),
     "channels+bomb": edict({
         "shape": [6, 17, 17]
+    }),
+    "channels_reduced": edict({
+        "shape": [4, 17, 17]
     })
 })
 

@@ -5,8 +5,8 @@ import os
 import pandas as pd
 
 configs = edict({
-    # which agent to use: {"MLP", "CNN", "CNNPlus", "channels_reduced"}
-    "AGENT": "MLP",
+    # which agent to use: {"MLP", "CNN", "CNNPlus"}
+    "AGENT": "CNN",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 1,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)

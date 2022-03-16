@@ -239,8 +239,8 @@ def compute_priority(self):
     # st_plus_N_Qs contains the maximum action-value for the state s_(t+N) if this state exists, otherwise it should simply be zero (which it will be since we initialized with 0)
     st_plus_N_Qs = np.zeros(len(n_step_rewards))
     # check whether the corresponding next state for a loop until index is present ("proper") meaning not None
-    st_plus_N_Qs[proper_next_states[loop_untils.astype(np.int16)]] = \
-        np.amax(self.model.predict_target(next_states[proper_next_states[loop_untils.astype(np.int16)],:]), axis=1)
+    st_plus_N_Qs[proper_next_states[loop_untils.astype(np.int32)]] = \
+        np.amax(self.model.predict_target(next_states[proper_next_states[loop_untils.astype(np.int32)],:]), axis=1)
     # adding together the discounted rewards for the next N steps and the maximum action-value of the state s_(t+N)
     q_updates = (n_step_rewards + st_plus_N_Qs)
     # predicting the original action-values for the state s_t

@@ -8,7 +8,7 @@ configs = edict({
     # which agent to use: {"MLP", "CNN", "CNNPlus"}
     "AGENT": "CNN",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
-    "EPSILON": 1,
+    "EPSILON": 0.2,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
     "EPSILON_DECAY": 0.999,
     # epsilon-greedy strategy minimum epsilon: epsilon := max(0.05, epsilon * decay^(#episode))
@@ -39,7 +39,7 @@ configs = edict({
     "PRIORITIZED_REPLAY": True,
     # Parameters for prioritized experience replay:
     "CONST_E": 1,
-    "CONST_A": 0.8,
+    "CONST_A": 0,
     # how often to update the target network
     "UPDATE_FREQ": 10,
     # whether to load a model
@@ -49,7 +49,7 @@ configs = edict({
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
-    "COMMENT": "testing whether CNN with 4 channels can still learn coin heaven",
+    "COMMENT": "testing whether CNN with 4 channels can still learn coin heaven, random sampling from exp buffer",
     # include command line call
     "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario coin_heaven --train 1 --no-gui",
     # use other agent to guide the first x episodes (our pretrain method)
@@ -66,7 +66,7 @@ configs = edict({
 
 auxiliary_rewards = edict({
     "MOVE_IN_CIRCLES": False,
-    "MOVE_TO_OR_FROM_COIN": False,
+    "MOVE_TO_OR_FROM_COIN": True,
     "STAY_OR_ESCAPE_BOMB": False
 })
 

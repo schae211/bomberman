@@ -64,7 +64,8 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
 
     # importantly, we will never fill our memory if the state is missing (old_game_state is None)
     if old_game_state:
-        rewards = reward_from_events(self, events, old_game_state, new_game_state)
+        rewards = reward_from_events(self=self, events=events, old_game_state=old_game_state,
+                                     new_game_state=new_game_state)
         self.memory.append(Transition(old_game_state["round"],              # round
                                       state_to_features(old_game_state),    # state
                                       self_action,                          # action
@@ -209,7 +210,6 @@ def prep_memory(self):
     return episodes, states, actions, next_states, proper_next_states, rewards
 
 
-
 @jit(nopython=True)
 def compute_n_step_reward(episodes, rewards, N, GAMMA):
     """
@@ -220,12 +220,12 @@ def compute_n_step_reward(episodes, rewards, N, GAMMA):
     """
     gammas = np.repeat(GAMMA, N)**(np.arange(N))            # gammas already taken to the power of the step
     n_step_rewards = np.zeros(len(episodes))                # initialize array to store the n_step rewards
-    loop_untils = np.empty(len(episodes))
+    loop_untils = np.zeros(len(episodes)).astype(np.int32)
     for i in range(len(loop_untils)):                       # making sure to prevent index out of range errors and looping into the next episode
-        loop_untils[i] = max([t for t in range(min(i+N+1, len(episodes))) if episodes[t] == episodes[i]])  # so t can maximally be i+N or len(episodes)-1
+        loop_untils[i] = max([t for t in range(min(i+N, len(episodes))) if episodes[t] == episodes[i]])  # so t can maximally be i+N or len(episodes)-1
     for i in range(len(n_step_rewards)):                    # looping through each step
         r = np.zeros(N)
-        for idx, t in enumerate(range(i, loop_untils[i])):
+        for idx, t in enumerate(range(i, loop_untils[i]+1)):
             r[idx] = rewards[t]
         r *= gammas
         n_step_rewards[i] = r.sum()

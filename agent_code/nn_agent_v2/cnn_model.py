@@ -24,15 +24,15 @@ class DoubleCNNModel(nn.Module):
         if configs.LOAD:
             print("LOAD MODEL")
             self.policy_net = torch.load(configs.LOAD_PATH,
-                                    map_location=torch.device(device))  # map_location=torch.device("cpu"))
+                                    map_location=torch.device(device))
             self.target_net = torch.load(configs.LOAD_PATH,
-                                    map_location=torch.device(device))  # map_location=torch.device("cpu"))
+                                    map_location=torch.device(device))
             self.target_net.load_state_dict(self.policy_net.state_dict())
             self.target_net.eval()
         else:
             print("INITIALIZE MODEL")
-            self.policy_net = CNN(input_channel=feature_specs.channels_reduced.shape[0])
-            self.target_net = CNN(input_channel=feature_specs.channels_reduced.shape[0])
+            self.policy_net = CNN(input_channel=feature_specs[configs.FEATURE_ENGINEERING].shape[0])
+            self.target_net = CNN(input_channel=feature_specs[configs.FEATURE_ENGINEERING].shape[0])
             self.target_net.load_state_dict(self.policy_net.state_dict())
             self.optimizer = torch.optim.AdamW(self.policy_net.parameters(), lr=configs.LEARNING_RATE)
         self.policy_net.to(device)
@@ -76,13 +76,12 @@ class DoubleCNNModel(nn.Module):
             loss.backward()
             self.optimizer.step()
 
-            if batch % 100 == 0:
+            if batch % configs.BATCH_SIZE == 0:
                 loss, current = loss.item(), batch * len(X)
                 print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
         torch.save(obj=self.policy_net, f=f'{configs["MODEL_LOC"]}/{SAVE_TIME}_{SAVE_KEY}_model.pt')
 
-        return loss
 
 class ConvMaxPool(nn.Module):
     def __init__(self, input_channel, output_channel, max_pooling=True, padding='same', kernel_size=(3, 3)):

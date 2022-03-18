@@ -5,18 +5,18 @@ import os
 import pandas as pd
 
 configs = edict({
-    # which agent to use: {"CNN", "MLP", "CNNPlus"}
+    # which MLP to use: {"CNN", "MLP", "CNNPlus"}
     "AGENT": "CNN",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 1.0,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
-    "EPSILON_DECAY": 0.9998,
+    "EPSILON_DECAY": 0.9999,
     # epsilon-greedy strategy minimum epsilon: epsilon := max(0.05, epsilon * decay^(#episode))
-    "EPSILON_MIN": 0.05,
+    "EPSILON_MIN": 0.1,
     # discount factor gamma, which discount future rewards
     "GAMMA": 0.9,
     # N-step temporal difference learning parameter, how many steps to look ahead for computing q-value updates
-    "N_STEPS": 10,
+    "N_STEPS": 3,
     # storing the last x transition as replay buffer fo r training
     "MEMORY_SIZE": 10_000,
     # how many transitions should be sampled from the memory to train the model
@@ -30,7 +30,7 @@ configs = edict({
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb", "channels_reduced}
-    "FEATURE_ENGINEERING": "channels",
+    "FEATURE_ENGINEERING": "standard",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
@@ -38,7 +38,7 @@ configs = edict({
     # should we use prioritized experience replay or sample the batches randomly
     "PRIORITIZED_REPLAY": True,
     # Parameters for prioritized experience replay:
-    "CONST_E": 1,
+    "CONST_E": 0.5,
     "CONST_A": 0,
     # how often to update the target network
     "UPDATE_FREQ": 10,
@@ -49,9 +49,9 @@ configs = edict({
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
-    "COMMENT": "testing whether sample size was just to large",
+    "COMMENT": "testing whether mlp with fewer steps works better",
     # include command line call
-    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario crate_heaven --train 1 --no-gui",
+    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario coin_heaven --train 1 --no-gui",
     # use other agent to guide the first x episodes (our pretrain method)
     "PRETRAIN": False,
     # number of episodes to use pretraining

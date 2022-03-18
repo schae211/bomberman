@@ -6,7 +6,7 @@ import pandas as pd
 
 configs = edict({
     # which MLP to use: {"CNN", "MLP", "CNNPlus"}
-    "AGENT": "CNN",
+    "AGENT": "MLP",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 1.0,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
@@ -51,7 +51,7 @@ configs = edict({
     # including some comment
     "COMMENT": "testing whether mlp with fewer steps works better",
     # include command line call
-    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario coin_heaven --train 1 --no-gui",
+    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario crate_heaven --train 1 --no-gui",
     # use other agent to guide the first x episodes (our pretrain method)
     "PRETRAIN": False,
     # number of episodes to use pretraining

@@ -8,7 +8,7 @@ configs = edict({
     # which agent to use: {"CNN", "MLP", "CNNPlus"}
     "AGENT": "CNN",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
-    "EPSILON": 1,
+    "EPSILON": 1.0,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
     "EPSILON_DECAY": 0.9998,
     # epsilon-greedy strategy minimum epsilon: epsilon := max(0.05, epsilon * decay^(#episode))
@@ -20,7 +20,7 @@ configs = edict({
     # storing the last x transition as replay buffer fo r training
     "MEMORY_SIZE": 10_000,
     # how many transitions should be sampled from the memory to train the model
-    "SAMPLE_SIZE": 1280,
+    "SAMPLE_SIZE": 256,
     # should we exploit symmetries to augment the training data
     "TS_AUGMENTATION": False,
     # what batch size should be used to train the model
@@ -39,25 +39,25 @@ configs = edict({
     "PRIORITIZED_REPLAY": True,
     # Parameters for prioritized experience replay:
     "CONST_E": 1,
-    "CONST_A": 0.7,
+    "CONST_A": 0,
     # how often to update the target network
     "UPDATE_FREQ": 10,
     # whether to load a model
     "LOAD": False,
     # where to load the model
-    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/15-03-2022-07-13_MLP_0.8_0.9998_0.01_0.9_6_10000_32_deterministic_standard_huber_0.0001_True_10_model.pt"),
+    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/16-03-2022-22-33_MLP_1_0.9998_0.05_0.9_10_10000_256_deterministic_standard_huber_0.0001_True_10_model.pt"),
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
-    "COMMENT": "fixed bug in TS engineering, regarding last reward",
+    "COMMENT": "testing whether sample size was just to large",
     # include command line call
-    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario coin_heaven --train 1 --no-gui",
+    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario crate_heaven --train 1 --no-gui",
     # use other agent to guide the first x episodes (our pretrain method)
     "PRETRAIN": False,
     # number of episodes to use pretraining
     "PRETRAIN_LEN": 0,
     # location of the save pretrain agent model
-    "PRETRAIN_LOC":  os.path.expanduser("~/bomberman_stats/15-03-2022-07-13_MLP_0.8_0.9998_0.01_0.9_6_10000_32_deterministic_standard_huber_0.0001_True_10_model.pt"),
+    "PRETRAIN_LOC":  os.path.expanduser("~/16-03-2022-22-33_MLP_1_0.9998_0.05_0.9_10_10000_256_deterministic_standard_huber_0.0001_True_10_model.pt"),
     # pretrain feature engineering: {"channels", "standard", "channels+bomb"}
     "PRETRAIN_FEATURES": "standard",
     # fraction of random moves performed by pretrained agent (so no perfect performance)

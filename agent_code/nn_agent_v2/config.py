@@ -6,17 +6,17 @@ import pandas as pd
 
 configs = edict({
     # which MLP to use: {"CNN", "MLP", "CNNPlus"}
-    "AGENT": "MLP",
+    "AGENT": "CNN",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 1.0,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
-    "EPSILON_DECAY": 0.9999,
+    "EPSILON_DECAY": 0.9998,
     # epsilon-greedy strategy minimum epsilon: epsilon := max(0.05, epsilon * decay^(#episode))
     "EPSILON_MIN": 0.05,
     # discount factor gamma, which discount future rewards
     "GAMMA": 0.9,
     # N-step temporal difference learning parameter, how many steps to look ahead for computing q-value updates
-    "N_STEPS": 3,
+    "N_STEPS": 10,
     # storing the last x transition as replay buffer fo r training
     "MEMORY_SIZE": 10_000,
     # how many transitions should be sampled from the memory to train the model
@@ -30,13 +30,13 @@ configs = edict({
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb", "channels_reduced}
-    "FEATURE_ENGINEERING": "standard",
+    "FEATURE_ENGINEERING": "channels",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
     "LEARNING_RATE": 0.0001,
     # should we use prioritized experience replay or sample the batches randomly
-    "PRIORITIZED_REPLAY": True,
+    "PRIORITIZED_REPLAY": False,
     # Parameters for prioritized experience replay:
     "CONST_E": 0.5,
     "CONST_A": 0,
@@ -49,7 +49,7 @@ configs = edict({
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
-    "COMMENT": "testing whether mlp with fewer steps works better",
+    "COMMENT": "testing whether old way of TS engineering works better",
     # include command line call
     "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario crate_heaven --train 1 --no-gui",
     # use other agent to guide the first x episodes (our pretrain method)
@@ -65,8 +65,8 @@ configs = edict({
 })
 
 auxiliary_rewards = edict({
-    "MOVE_IN_CIRCLES": False,
-    "MOVE_TO_OR_FROM_COIN": False,
+    "MOVE_IN_CIRCLES": True,
+    "MOVE_TO_OR_FROM_COIN": True,
     "STAY_OR_ESCAPE_BOMB": False
 })
 

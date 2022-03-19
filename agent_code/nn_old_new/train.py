@@ -6,7 +6,7 @@ import pandas as pd
 
 import events as e
 from agent_code.nn_old_new.callbacks import state_to_features, coin_bfs, save_bfs, get_bomb_map
-from agent_code.nn_old_new.config import configs, SAVE_KEY, SAVE_TIME
+from agent_code.nn_old_new.config import configs, reward_specs, feature_specs, SAVE_KEY, SAVE_TIME
 
 # a way to structure our code?
 Transition = namedtuple("Transition",
@@ -20,35 +20,20 @@ ACTION_TRANSLATE_REV = {val: key for key, val in ACTION_TRANSLATE.items()}
 
 # Hyper parameters
 GAMMA = configs["GAMMA"]
-EPSILON = configs["EPSILON"]
-EPSILON_REDUCTION = configs["EPSILON_DECAY"]
-MIN_EPSILON = configs["EPSILON_MIN"]
 N = configs["N_STEPS"]
-MEMORY_SIZE = configs["MEMORY_SIZE"]
 BATCH_SIZE = configs["BATCH_SIZE"]
 
 # should training data be augmented? {True, False}
 # keep in mind that it only works for proper channels at the moment.
 AUGMENT = False
 
-# Needed for augmenting training data
-GAME_SIZE = 17
-
 # specify argument whether training statistics should be saved
-SAVE_TRAIN = True
 SAVE_EVERY = 200
 INCLUDE_EVERY = 4 # only include every x episode in the saved stats
 SAVE_DIR = configs["MODEL_LOC"]
-if SAVE_TRAIN:
-    step_information = {"round": [], "step": [], "events": [], "reward": []}
-    episode_information = {"round": [], "TS_MSE_1": [], "TS_MSE_2": [], "TS_MSE_3": [],
-                           "TS_MSE_4": [], "TS_MSE_5": [], "TS_MSE_6": []}
-
-# global variable to store the last states used to shape rewards
-LAST_STATES = 5
-
-#
-PRIORITIZED_REPLAY = configs.PRIORITIZED_REPLAY
+step_information = {"round": [], "step": [], "events": [], "reward": []}
+episode_information = {"round": [], "TS_MSE_1": [], "TS_MSE_2": [], "TS_MSE_3": [],
+                       "TS_MSE_4": [], "TS_MSE_5": [], "TS_MSE_6": []}
 
 
 def setup_training(self):
@@ -60,13 +45,13 @@ def setup_training(self):
     :param self: This object is passed to all callbacks and you can set arbitrary values.
     """
     # Set up an array that will keep track of transition tuples (s, a, r, s')
-    self.memory = deque(maxlen=MEMORY_SIZE)
-    self.last_states = deque(maxlen=LAST_STATES)
+    self.memory = deque(maxlen=configs["MEMORY_SIZE"])
+    self.last_states = deque(maxlen=5)
 
     # adding epsilon var to agent
-    self.epsilon = EPSILON
-    self.epsilon_reduction = EPSILON_REDUCTION
-    self.epsilon_min = MIN_EPSILON
+    self.epsilon = configs["EPSILON"]
+    self.epsilon_reduction = configs["EPSILON_DECAY"]
+    self.epsilon_min = configs["EPSILON_MIN"]
 
 
 def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_state: dict, events: List[str]):
@@ -94,11 +79,11 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
     # fill our memory after each step, state_to_features is defined in callbacks.py and imported above
     if old_game_state:
         rewards = reward_from_events(self, events, old_game_state, new_game_state)
-        self.memory.append(Transition(old_game_state["round"],
-                                      state_to_features(old_game_state),  # state
-                                      self_action,  # action
-                                      state_to_features(new_game_state),  # next_state
-                                      rewards))  # reward
+        self.memory.append(Transition(old_game_state["round"],              # episode
+                                      state_to_features(old_game_state),    # state
+                                      self_action,                          # action
+                                      state_to_features(new_game_state),    # next_state
+                                      rewards))                             # reward
 
 
         # use global step information variable
@@ -160,10 +145,8 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
     # TODO: Check if implementation for Prioritized Replay is correct
     if len(self.memory) > BATCH_SIZE:
-        # Prioritized Replay: Before building our training dataset, we need to compute the temporal difference error
-        # for transitions currently stored in the memory (aka replay buffer).
-        priorities = get_priority(self)
-        batch = np.random.choice(a=np.arange(0, len(self.memory)), size=BATCH_SIZE, replace=False, p=priorities)
+        #priorities = get_priority(self)
+        batch = np.random.choice(a=np.arange(0, len(self.memory)), size=BATCH_SIZE, replace=False)#, p=priorities)
     else:
         batch = range(len(self.memory))
 
@@ -222,9 +205,6 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         x.append(state)
         y.append(q_values)
 
-    # importantly partial fitting is not possible with most methods except for NN (so we fit again to the whole TS)
-    self.logger.debug(f"Fitting the model using the input as specified below:")
-
     # reshape our predictors and checking the shape
     # FIXME: Only working for Conv!
     x_reshaped = np.stack(x, axis=0)[:,0,:,:,:]
@@ -237,12 +217,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     if last_game_state:
         episode_information["round"].append(last_game_state["round"])
         TS_MSE = ((self.model.predict_policy(x_reshaped) - y_reshaped) ** 2).mean(axis=0)
-        episode_information["TS_MSE_1"].append(TS_MSE[0])
-        episode_information["TS_MSE_2"].append(TS_MSE[1])
-        episode_information["TS_MSE_3"].append(TS_MSE[2])
-        episode_information["TS_MSE_4"].append(TS_MSE[3])
-        episode_information["TS_MSE_5"].append(TS_MSE[4])
-        episode_information["TS_MSE_6"].append(TS_MSE[5])
+        for i in range(6): episode_information[f"TS_MSE_{i+1}"].append(TS_MSE[i])
 
     if last_game_state["round"] % SAVE_EVERY == 0:
         pd.DataFrame(episode_information).to_csv(f"{SAVE_DIR}/{SAVE_TIME}_{SAVE_KEY}_episode_stats.csv", index=False)
@@ -255,10 +230,7 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
     """
 
     # for the first step nothing is returned, but I need the step argument to discount the coin reward
-    if old_game_state is None:
-        step = 0
-    else:
-        step = old_game_state["step"]
+    step = 0 if old_game_state is None else old_game_state["step"]
 
     # add reward/penalty based on whether the agent moved towards/away from the nearest coin (if coins were visible)
     if old_game_state and new_game_state and old_game_state["coins"] != []:
@@ -294,21 +266,32 @@ def reward_from_events(self, events: List[str], old_game_state: dict, new_game_s
             events.append(e.MOVE_IN_CIRCLES)
 
     game_rewards = {
-        e.COIN_COLLECTED: 5,
-        e.KILLED_SELF: -20,
-        e.INVALID_ACTION: -2,
-        e.WAITED: -0.5,
-        e.MOVE_TO_COIN: 1,
-        e.MOVE_FROM_COIN: -1,
-        e.MOVE_IN_CIRCLES: -1,
-        e.CRATE_DESTROYED: 2,
-        e.COIN_FOUND: 2,
+        # original events
+        e.MOVED_RIGHT: reward_specs.MOVED_RIGHT,
+        e.MOVED_UP: reward_specs.MOVED_UP,
+        e.MOVED_DOWN: reward_specs.MOVED_DOWN,
+        e.MOVED_LEFT: reward_specs.MOVED_LEFT,
+        e.WAITED: reward_specs.WAITED,
+        e.INVALID_ACTION: reward_specs.INVALID_ACTION,
+        e.BOMB_DROPPED: reward_specs.BOMB_DROPPED,
+        e.BOMB_EXPLODED: reward_specs.BOMB_EXPLODED,
+        e.CRATE_DESTROYED: reward_specs.CRATE_DESTROYED,
+        e.COIN_FOUND: reward_specs.COIN_FOUND,
+        e.COIN_COLLECTED: reward_specs.COIN_COLLECTED,
+        e.KILLED_OPPONENT: reward_specs.KILLED_OPPONENT,
+        e.KILLED_SELF: reward_specs.KILLED_SELF,
+        e.GOT_KILLED: reward_specs.GOT_KILLED,
+        e.OPPONENT_ELIMINATED: reward_specs.OPPONENT_ELIMINATED,
+        e.SURVIVED_ROUND: reward_specs.SURVIVED_ROUND,
+        # auxiliary events and rewards:
+        e.MOVE_TO_COIN: reward_specs.MOVE_TO_COIN,
+        e.MOVE_FROM_COIN: reward_specs.MOVE_FROM_COIN,
+        e.MOVE_IN_CIRCLES: reward_specs.MOVE_IN_CIRCLES,
+        e.STAY_IN_BOMB: reward_specs.STAY_IN_BOMB,
+        e.ESCAPE_FROM_BOMB: reward_specs.ESCAPE_FROM_BOMB
     }
-    reward_sum = 0
-    for event in events:
-        if event in game_rewards:
-            reward_sum += game_rewards[event]
 
+    reward_sum = np.array([game_rewards[event] for event in events if event in game_rewards]).sum()
     self.logger.info(f"Awarded {reward_sum} for events {', '.join(events)}")
     return reward_sum
 

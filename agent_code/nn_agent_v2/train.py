@@ -242,7 +242,7 @@ def compute_priority(self):
     st_plus_N_Qs[proper_next_states[loop_untils.astype(np.int32)]] = \
         np.amax(self.model.predict_target(next_states[proper_next_states[loop_untils.astype(np.int32)],:]), axis=1)
     # adding together the discounted rewards for the next N steps and the maximum action-value of the state s_(t+N)
-    q_updates = (n_step_rewards + st_plus_N_Qs)
+    q_updates = (n_step_rewards + configs.GAMMA**configs.N_STEPS * st_plus_N_Qs)
     # predicting the original action-values for the state s_t
     old_Qs = self.model.predict_policy(states)
     # subsetting only the action-values of the actions that were actually taken

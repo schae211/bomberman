@@ -1,10 +1,9 @@
 import os
 import pickle
 import numpy as np
-from agent_code.nn_agent_v1.nn_model import NNModel
-from agent_code.nn_agent_v1.dnn_model import DoubleNNModel
-from agent_code.nn_agent_v1.cnn_model import DoubleCNNModel
-from agent_code.nn_agent_v1.config import configs
+from agent_code.nn_old.dnn_model import DoubleNNModel
+from agent_code.nn_old.cnn_model import DoubleCNNModel
+from agent_code.nn_old.config import configs
 
 # helper lists and dictionaries for actions
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
@@ -33,12 +32,10 @@ def setup(self):
     """
     if self.train or not os.path.isfile("my-saved-model.pt"):
         self.logger.info("Setting up model from scratch.")
-        #self.model = NNModel()
         #self.model = DoubleNNModel()
         self.model = DoubleCNNModel()
     else:
         self.logger.info("Loading model from saved state.")
-        #self.model = NNModel()
         #self.model = DoubleNNModel()
         self.model = DoubleCNNModel()
 

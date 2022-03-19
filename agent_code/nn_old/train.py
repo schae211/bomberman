@@ -8,11 +8,11 @@ import random
 from datetime import datetime
 
 import events as e
-from agent_code.nn_agent_v1.callbacks import state_to_features
-from agent_code.nn_agent_v1.callbacks import coin_bfs, save_bfs
-from agent_code.nn_agent_v1.callbacks import get_bomb_map
-from agent_code.nn_agent_v1.config import configs
-from agent_code.nn_agent_v1.config import SAVE_KEY, SAVE_TIME
+from agent_code.nn_old.callbacks import state_to_features
+from agent_code.nn_old.callbacks import coin_bfs, save_bfs
+from agent_code.nn_old.callbacks import get_bomb_map
+from agent_code.nn_old.config import configs
+from agent_code.nn_old.config import SAVE_KEY, SAVE_TIME
 
 
 # a way to structure our code?

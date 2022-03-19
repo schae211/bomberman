@@ -10,11 +10,6 @@ ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 ACTION_TRANSLATE = {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3, "WAIT": 4, "BOMB": 5}
 ACTION_TRANSLATE_REV = {val: key for key, val in ACTION_TRANSLATE.items()}
 
-# importing and defining parameters
-DEFAULT_PROBS = configs["DEFAULT_PROBS"]
-POLICY = configs["POLICY"]
-FEAT_ENG = configs["FEATURE_ENGINEERING"]
-
 
 def setup(self):
     """
@@ -30,14 +25,8 @@ def setup(self):
 
     :param self: This object is passed to all callbacks and you can set arbitrary values.
     """
-    if self.train or not os.path.isfile("my-saved-model.pt"):
-        self.logger.info("Setting up model from scratch.")
-        #self.model = DoubleNNModel()
-        self.model = DoubleCNNModel()
-    else:
-        self.logger.info("Loading model from saved state.")
-        #self.model = DoubleNNModel()
-        self.model = DoubleCNNModel()
+    if configs.AGENT == "cnn_old": self.model = DoubleCNNModel()
+    if configs.AGENT == "mlp_old": self.model = DoubleNNModel()
 
 
 def act(self, game_state: dict) -> str:
@@ -54,18 +43,18 @@ def act(self, game_state: dict) -> str:
     episode_n = 0 if game_state is None else game_state["round"]
     if self.train and np.random.rand() <= max(self.epsilon_min, self.epsilon * self.epsilon_reduction ** episode_n):
         self.logger.debug("Choosing action at random due to epsilon-greedy policy")
-        action = np.random.choice(ACTIONS, p=DEFAULT_PROBS)
+        action = np.random.choice(ACTIONS, p=configs["DEFAULT_PROBS"])
         return action
     else:
         self.logger.debug("Querying fitted model for action.")
         features = state_to_features(game_state)  #.reshape(1, -1)  # .reshape(1, -1) needed if single sample for MultiOutputRegressor
         q_values = self.model.predict_policy(features).reshape(-1)  # computing q-values using our fitted model
 
-        if POLICY == "deterministic":
+        if configs["POLICY"] == "deterministic":
             action = ACTION_TRANSLATE_REV[np.argmax(q_values)]
             return action
 
-        elif POLICY == "stochastic":
+        elif configs["POLICY"] == "stochastic":
             # use softmax to translate q-values to probabilities,
             probs = np.exp(q_values) / np.sum(np.exp(q_values))
             return np.random.choice(ACTIONS, p=probs)
@@ -89,7 +78,7 @@ def state_to_features(game_state: dict) -> np.array:
     if game_state is None:
         return None
 
-    if FEAT_ENG == "channels":
+    if configs["FEATURE_ENGINEERING"] == "channels":
         object_map = game_state["field"]
 
         coin_map = np.zeros_like(game_state["field"])
@@ -111,7 +100,7 @@ def state_to_features(game_state: dict) -> np.array:
         # and return them as a vector
         return stacked_channels[None,:]
 
-    elif FEAT_ENG == "standard":
+    elif configs["FEATURE_ENGINEERING"] == "standard":
 
         # 1. 1D array, len = 4: indicating in which directions the agent can move (up, right, down, left)
         awareness = get_awareness(object_position=game_state["field"], self_position=game_state["self"][3])

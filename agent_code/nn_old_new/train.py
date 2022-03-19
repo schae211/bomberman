@@ -21,11 +21,6 @@ ACTION_TRANSLATE_REV = {val: key for key, val in ACTION_TRANSLATE.items()}
 # Hyper parameters
 GAMMA = configs["GAMMA"]
 N = configs["N_STEPS"]
-BATCH_SIZE = configs["BATCH_SIZE"]
-
-# should training data be augmented? {True, False}
-# keep in mind that it only works for proper channels at the moment.
-AUGMENT = False
 
 # specify argument whether training statistics should be saved
 SAVE_EVERY = 200
@@ -143,10 +138,9 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     # initialize our x and y which we use for fitting later on
     x, y = [], []
 
-    # TODO: Check if implementation for Prioritized Replay is correct
-    if len(self.memory) > BATCH_SIZE:
+    if len(self.memory) > configs["BATCH_SIZE"]:
         #priorities = get_priority(self)
-        batch = np.random.choice(a=np.arange(0, len(self.memory)), size=BATCH_SIZE, replace=False)#, p=priorities)
+        batch = np.random.choice(a=np.arange(0, len(self.memory)), size=configs["BATCH_SIZE"], replace=False)#, p=priorities)
     else:
         batch = range(len(self.memory))
 

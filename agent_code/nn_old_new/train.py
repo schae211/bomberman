@@ -139,8 +139,8 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     x, y = [], []
 
     if len(self.memory) > configs["BATCH_SIZE"]:
-        #priorities = get_priority(self)
-        batch = np.random.choice(a=np.arange(0, len(self.memory)), size=configs["BATCH_SIZE"], replace=False)#, p=priorities)
+        priorities = get_priority(self)
+        batch = np.random.choice(a=np.arange(0, len(self.memory)), size=configs["BATCH_SIZE"], replace=False, p=priorities)
     else:
         batch = range(len(self.memory))
 

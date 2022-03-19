@@ -6,7 +6,7 @@ import pandas as pd
 
 configs = edict({
     # which MLP to use: {"CNN", "MLP", "CNNPlus"}
-    "AGENT": "MLP",
+    "AGENT": "CNN",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 1.0,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
@@ -30,15 +30,15 @@ configs = edict({
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb", "channels_reduced}
-    "FEATURE_ENGINEERING": "standard",
+    "FEATURE_ENGINEERING": "channels",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
     "LEARNING_RATE": 0.0001,
     # should we use prioritized experience replay or sample the batches randomly
-    "PRIORITIZED_REPLAY": False,
+    "PRIORITIZED_REPLAY": True,
     # Parameters for prioritized experience replay:
-    "CONST_E": 0.5,
+    "CONST_E": 1,
     "CONST_A": 0,
     # how often to update the target network
     "UPDATE_FREQ": 10,

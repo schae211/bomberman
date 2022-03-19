@@ -12,7 +12,7 @@ configs = edict({
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
     "EPSILON_DECAY": 0.9999,
     # epsilon-greedy strategy minimum epsilon: epsilon := max(0.05, epsilon * decay^(#episode))
-    "EPSILON_MIN": 0.1,
+    "EPSILON_MIN": 0.05,
     # discount factor gamma, which discount future rewards
     "GAMMA": 0.9,
     # N-step temporal difference learning parameter, how many steps to look ahead for computing q-value updates

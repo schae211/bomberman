@@ -6,15 +6,15 @@ import pandas as pd
 
 configs = edict({
     # which MLP to use: {"CNN", "MLP", "CNNPlus"}
-    "AGENT": "CNN",
+    "AGENT": "MLP",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 1.0,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
-    "EPSILON_DECAY": 0.9998,
+    "EPSILON_DECAY": 0.9999,
     # epsilon-greedy strategy minimum epsilon: epsilon := max(0.05, epsilon * decay^(#episode))
-    "EPSILON_MIN": 0.05,
+    "EPSILON_MIN": 0.01,
     # discount factor gamma, which discount future rewards
-    "GAMMA": 0.9,
+    "GAMMA": 0.8,
     # N-step temporal difference learning parameter, how many steps to look ahead for computing q-value updates
     "N_STEPS": 10,
     # storing the last x transition as replay buffer fo r training
@@ -30,7 +30,7 @@ configs = edict({
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb", "channels_reduced}
-    "FEATURE_ENGINEERING": "channels",
+    "FEATURE_ENGINEERING": "standard",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
@@ -43,19 +43,19 @@ configs = edict({
     # how often to update the target network
     "UPDATE_FREQ": 10,
     # whether to load a model
-    "LOAD": False,
+    "LOAD": True,
     # where to load the model
-    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/19-03-2022-21-23_MLP_1.0_0.9998_0.05_0.9_10_10000_256_deterministic_standard_huber_0.0001_True_10_model.pt"),
+    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/pretrain_models/19-03-2022-21-23_MLP_1.0_0.9998_0.05_0.9_10_10000_256_deterministic_standard_huber_0.0001_True_10_model.pt"),
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
-    "COMMENT": "testing whether CNN with pretraining is better on crate heaven",
+    "COMMENT": "testing whether pretrained mlp can play against rule-based agents",
     # include command line call
-    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario crate_heaven --train 1 --no-gui",
+    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 rule_based_agent rule_based_agent rule_based_agent --scenario crate_heaven --train 1 --no-gui",
     # use other agent to guide the first x episodes (our pretrain method)
-    "PRETRAIN": True,
+    "PRETRAIN": False,
     # number of episodes to use pretraining
-    "PRETRAIN_LEN": 20_000,
+    "PRETRAIN_LEN": 0,
     # location of the save pretrain agent model
     "PRETRAIN_LOC":  os.path.expanduser("~/bomberman_stats/pretrain_models/19-03-2022-21-23_MLP_1.0_0.9998_0.05_0.9_10_10000_256_deterministic_standard_huber_0.0001_True_10_model.pt"),
     # pretrain feature engineering: {"channels", "standard", "channels+bomb"}

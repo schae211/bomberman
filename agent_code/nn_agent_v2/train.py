@@ -62,26 +62,24 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
     # specify that we want to use the global step information variable
     global step_information
 
-    # importantly, we will never fill our memory if the state is missing (old_game_state is None)
-    if old_game_state:
-        rewards = reward_from_events(self=self, events=events, old_game_state=old_game_state,
-                                     new_game_state=new_game_state)
-        self.memory.append(Transition(old_game_state["round"],              # round
-                                      state_to_features(old_game_state),    # state
-                                      self_action,                          # action
-                                      state_to_features(new_game_state),    # next_state
-                                      rewards))                             # reward
+    rewards = reward_from_events(self=self, events=events, old_game_state=old_game_state,
+                                 new_game_state=new_game_state)
+    self.memory.append(Transition(old_game_state["round"],              # round
+                                  state_to_features(old_game_state),    # state
+                                  self_action,                          # action
+                                  state_to_features(new_game_state),    # next_state
+                                  rewards))                             # reward
 
 
-        # use global step information variable
-        if (old_game_state["round"] % INCLUDE_EVERY) == 0:
-            step_information["round"].append(old_game_state["round"])
-            step_information["step"].append(old_game_state["step"])
-            step_information["events"].append("| ".join(map(repr, events)))
-            step_information["reward"].append(rewards)
+    # use global step information variable
+    if (old_game_state["round"] % INCLUDE_EVERY) == 0:
+        step_information["round"].append(old_game_state["round"])
+        step_information["step"].append(old_game_state["step"])
+        step_information["events"].append("| ".join(map(repr, events)))
+        step_information["reward"].append(rewards)
 
-        # keep status of last N steps for reward shaping
-        self.last_states.append(old_game_state["self"][3])
+    # keep status of last N steps for reward shaping
+    self.last_states.append(old_game_state["self"][3])
 
 
 def end_of_round(self, last_game_state: dict, last_action: str, events: List[str]):

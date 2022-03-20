@@ -6,7 +6,7 @@ import pandas as pd
 
 configs = edict({
     # which MLP to use: {"CNN", "MLP", "CNNPlus"}
-    "AGENT": "CNNPlus",
+    "AGENT": "CNN",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 1.0,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
@@ -30,7 +30,7 @@ configs = edict({
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb", "channels_reduced}
-    "FEATURE_ENGINEERING": "channels+bomb",
+    "FEATURE_ENGINEERING": "standard",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
@@ -43,25 +43,25 @@ configs = edict({
     # how often to update the target network
     "UPDATE_FREQ": 10,
     # whether to load a model
-    "LOAD": False,
+    "LOAD": True,
     # where to load the model
-    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/16-03-2022-22-33_MLP_1_0.9998_0.05_0.9_10_10000_256_deterministic_standard_huber_0.0001_True_10_model.pt"),
+    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/19-03-2022-21-23_MLP_1.0_0.9998_0.05_0.9_10_10000_256_deterministic_standard_huber_0.0001_True_10_model.pt"),
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
-    "COMMENT": "testing whether CNN plus bomb can learn to play crate heaven",
+    "COMMENT": "testing whether CNN with pretraining is better on crate heaven",
     # include command line call
     "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 --scenario crate_heaven --train 1 --no-gui",
     # use other agent to guide the first x episodes (our pretrain method)
-    "PRETRAIN": False,
+    "PRETRAIN": True,
     # number of episodes to use pretraining
-    "PRETRAIN_LEN": 0,
+    "PRETRAIN_LEN": 20_000,
     # location of the save pretrain agent model
-    "PRETRAIN_LOC":  os.path.expanduser("~/16-03-2022-22-33_MLP_1_0.9998_0.05_0.9_10_10000_256_deterministic_standard_huber_0.0001_True_10_model.pt"),
+    "PRETRAIN_LOC":  os.path.expanduser("~/bomberman_stats/pretrain_models/19-03-2022-21-23_MLP_1.0_0.9998_0.05_0.9_10_10000_256_deterministic_standard_huber_0.0001_True_10_model.pt"),
     # pretrain feature engineering: {"channels", "standard", "channels+bomb"}
     "PRETRAIN_FEATURES": "standard",
     # fraction of random moves performed by pretrained agent (so no perfect performance)
-    "PRETRAIN_RANDOM": 0.3
+    "PRETRAIN_RANDOM": 0.05
 })
 
 auxiliary_rewards = edict({

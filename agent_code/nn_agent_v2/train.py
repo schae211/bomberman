@@ -62,6 +62,9 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
     # specify that we want to use the global step information variable
     global step_information
 
+
+    # keep status of last N steps for reward shaping
+    self.last_states.append(old_game_state["self"][3])
     rewards = reward_from_events(self=self, events=events, old_game_state=old_game_state,
                                  new_game_state=new_game_state)
     self.memory.append(Transition(old_game_state["round"],              # round
@@ -77,9 +80,6 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
         step_information["step"].append(old_game_state["step"])
         step_information["events"].append("| ".join(map(repr, events)))
         step_information["reward"].append(rewards)
-
-    # keep status of last N steps for reward shaping
-    self.last_states.append(old_game_state["self"][3])
 
 
 def end_of_round(self, last_game_state: dict, last_action: str, events: List[str]):

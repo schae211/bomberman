@@ -43,7 +43,7 @@ configs = edict({
     # how often to update the target network
     "UPDATE_FREQ": 10,
     # whether to load a model
-    "LOAD": True,
+    "LOAD": False,
     # where to load the model
     "LOAD_PATH": os.path.expanduser("~/bomberman_stats/pretrain_models/20-03-2022-17-11_MLP_1.0_0.9999_0.001_0.8_10_10000_256_deterministic_standard_huber_0.0001_True_10_model.pt"),
     # where to store and load the model,

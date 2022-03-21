@@ -16,7 +16,7 @@ configs = edict({
     # discount factor gamma, which discount future rewards
     "GAMMA": 0.8,
     # N-step temporal difference learning parameter, how many steps to look ahead for computing q-value updates
-    "N_STEPS": 10,
+    "N_STEPS": 1,
     # storing the last x transition as replay buffer fo r training
     "MEMORY_SIZE": 10_000,
     # how many transitions should be sampled from the memory to train the model

@@ -47,7 +47,7 @@ def act(self, game_state: dict) -> str:
 
     # configure pretrain
     if configs.PRETRAIN and episode_n <= configs.PRETRAIN_LEN:
-        if np.random.rand() <= configs.PRETRAIN_RANDOM:
+        if np.random.rand() <= configs.PRETRAIN_RANDOM * configs.PRETRAIN_RANDOM_DECAY ** episode_n:
             self.logger.debug("Pretrained agent is playing random")
             return np.random.choice(ACTIONS, p=configs.DEFAULT_PROBS)
         else:

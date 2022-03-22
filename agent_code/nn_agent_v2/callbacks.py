@@ -443,7 +443,7 @@ def save_bfs(object_position, explosion_map, self_position):
 
 
 # default dist can be reduced to make computations faster
-def crate_bfs(object_position, self_position, bomb_list, explosion_map, max_dist=14, distance_discount=1/4):
+def crate_bfs(object_position, self_position, bomb_list, explosion_map, max_dist=16, distance_discount=0.8):
     """
     Find path to position where bomb destroys most crates via breadth-first search (BFS)
     Thereby, we have to take the distance to the considered positions into consideration (trade-off!)

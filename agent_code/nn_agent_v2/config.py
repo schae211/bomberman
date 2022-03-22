@@ -49,7 +49,7 @@ configs = edict({
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
-    "COMMENT": "train MLP against rule_based_agents and itself on classic scenario with 400 steps",
+    "COMMENT": "train MLP against rule_based_agents and itself on classic scenario with 400 steps, also increasing sample size",
     # include command line call
     "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 nn_agent_v2 rule_based_agent rule_based_agent --scenario classic --train 1 --no-gui",
     # use other agent to guide the first x episodes (our pretrain method)

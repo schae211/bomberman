@@ -3,12 +3,8 @@ from pathlib import Path
 
 from fallbacks import pygame
 
-# TODO: tweak here
-# Original Game properties
 COLS = 17
 ROWS = 17
-# COLS = 7
-# ROWS = 7
 
 SCENARIOS = {
     # subtask 1
@@ -32,8 +28,8 @@ SCENARIOS = {
 MAX_AGENTS = 4
 
 # TODO: tweak here
-MAX_STEPS = 200
-# MAX_STEPS = 400
+# MAX_STEPS = 200
+MAX_STEPS = 400
 
 # GUI properties
 GRID_SIZE = 30

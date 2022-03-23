@@ -61,7 +61,7 @@ def act(self, game_state: dict) -> str:
 
     # reduce exploration over time, account for pretraining ("episode_n-configs.PRETRAIN_LEN")
     if configs.EPSILON_DECAY_LINEAR:
-        current_epsilon = max(self.epsilon - self.slope*(episode_n-configs.PRETRAIN_LEN), self.epsilon_min)
+        current_epsilon = max(self.epsilon - self.eps_slope*(episode_n-configs.PRETRAIN_LEN), self.epsilon_min)
     else:
         current_epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_reduction ** (episode_n-configs.PRETRAIN_LEN))
     if self.train and np.random.rand() <= current_epsilon:

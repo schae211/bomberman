@@ -60,7 +60,11 @@ def act(self, game_state: dict) -> str:
                 return np.random.choice(ACTIONS, p=(np.exp(q_values) / np.sum(np.exp(q_values))))
 
     # reduce exploration over time, account for pretraining ("episode_n-configs.PRETRAIN_LEN")
-    if self.train and np.random.rand() <= max(self.epsilon_min, self.epsilon * self.epsilon_reduction ** (episode_n-configs.PRETRAIN_LEN)):
+    if configs.EPSILON_DECAY_LINEAR:
+        current_epsilon = max(self.epsilon - self.slope*(episode_n-configs.PRETRAIN_LEN), self.epsilon_min)
+    else:
+        current_epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_reduction ** (episode_n-configs.PRETRAIN_LEN))
+    if self.train and np.random.rand() <= current_epsilon:
         self.logger.debug("Choosing action at random due to epsilon-greedy policy")
         action = np.random.choice(ACTIONS, p=configs.DEFAULT_PROBS)
         return action

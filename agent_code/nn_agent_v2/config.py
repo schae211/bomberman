@@ -6,21 +6,25 @@ import pandas as pd
 
 configs = edict({
     # which MLP to use: {"CNN", "MLP", "CNNPlus"}
-    "AGENT": "MLP",
+    "AGENT": "CNNPlus",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
-    "EPSILON": 1,
+    "EPSILON": 1.0,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
     "EPSILON_DECAY": 0.9999,
     # epsilon-greedy strategy minimum epsilon: epsilon := max(0.05, epsilon * decay^(#episode))
     "EPSILON_MIN": 0.001,
+    # length of epsilon-greedy decay
+    "EPSILON_DECAY_LEN": 20_000,
+    # epsilon decay linear or exponential
+    "EPSILON_DECAY_LINEAR": True,
     # discount factor gamma, which discount future rewards
-    "GAMMA": 0.8,
+    "GAMMA": 0.9,
     # N-step temporal difference learning parameter, how many steps to look ahead for computing q-value updates
     "N_STEPS": 1,
     # storing the last x transition as replay buffer fo r training
     "MEMORY_SIZE": 12_000,
     # how many transitions should be sampled from the memory to train the model
-    "SAMPLE_SIZE": 512,
+    "SAMPLE_SIZE": 256,
     # should we exploit symmetries to augment the training data
     "TS_AUGMENTATION": False,
     # what batch size should be used to train the model
@@ -30,7 +34,7 @@ configs = edict({
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb"}
-    "FEATURE_ENGINEERING": "standard",
+    "FEATURE_ENGINEERING": "channels+bomb",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
@@ -45,7 +49,7 @@ configs = edict({
     # whether to load a model
     "LOAD": True,
     # where to load the model
-    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/pretrain_models/20-03-2022-15-21_MLP_1.0_0.9999_0.01_0.8_10_10000_256_deterministic_standard_huber_0.0001_True_10_model.pt"),
+    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/pretrain_models/21-03-2022-09-12_CNNPlus_0.2_0.9999_0.001_0.8_1_10000_256_deterministic_channels+bomb_huber_0.0001_True_10_model.pt"),
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment

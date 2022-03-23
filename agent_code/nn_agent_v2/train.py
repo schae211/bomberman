@@ -38,6 +38,7 @@ def setup_training(self):
     self.epsilon = configs.EPSILON
     self.epsilon_reduction = configs.EPSILON_DECAY
     self.epsilon_min = configs.EPSILON_MIN
+    self.eps_slope = (self.epsilon - self.epsilon_min) / configs.EPSILON_DECAY_LEN
 
 
 def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_state: dict, events: List[str]):

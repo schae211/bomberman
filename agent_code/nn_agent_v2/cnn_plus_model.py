@@ -28,7 +28,7 @@ class DoubleCNNPlusModel(nn.Module):
             self.target_net = torch.load(configs.LOAD_PATH,
                                     map_location=torch.device(device))  # map_location=torch.device("cpu"))
             self.target_net.load_state_dict(self.policy_net.state_dict())
-            self.target_net.eval()
+            self.optimizer = torch.optim.AdamW(self.policy_net.parameters(), lr=configs.LEARNING_RATE)
         else:
             print("INITIALIZE MODEL")
             self.policy_net = CNN(input_channel=5)

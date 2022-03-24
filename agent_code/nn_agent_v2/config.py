@@ -18,7 +18,7 @@ configs = edict({
     # epsilon decay linear or exponential
     "EPSILON_DECAY_LINEAR": True,
     # discount factor gamma, which discount future rewards
-    "GAMMA": 0.9,
+    "GAMMA": 0.99,
     # N-step temporal difference learning parameter, how many steps to look ahead for computing q-value updates
     "N_STEPS": 1,
     # storing the last x transition as replay buffer fo r training
@@ -89,7 +89,7 @@ reward_specs = edict({
     "CRATE_DESTROYED": 4,
     "COIN_FOUND": 0,
     "COIN_COLLECTED": 5,
-    "KILLED_OPPONENT": 25,
+    "KILLED_OPPONENT": 50,
     "KILLED_SELF": 0,  # setting to 0 because also included in GOT_KILLED
     "GOT_KILLED": -25,
     "OPPONENT_ELIMINATED": 0,

@@ -24,7 +24,7 @@ configs = edict({
     # storing the last x transition as replay buffer fo r training
     "MEMORY_SIZE": 12_000,
     # how many transitions should be sampled from the memory to train the model
-    "SAMPLE_SIZE": 256,
+    "SAMPLE_SIZE": 1024,
     # should we exploit symmetries to augment the training data
     "TS_AUGMENTATION": False,
     # what batch size should be used to train the model
@@ -49,11 +49,11 @@ configs = edict({
     # whether to load a model
     "LOAD": True,
     # where to load the model
-    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/pretrain_models/21-03-2022-09-12_CNNPlus_0.2_0.9999_0.001_0.8_1_10000_256_deterministic_channels+bomb_huber_0.0001_True_10_model.pt"),
+    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/pretrain_models/23-03-2022-08-45_CNNPlus_1.0_0.9999_0.001_0.9_1_12000_256_deterministic_channels+bomb_huber_0.0001_True_10_model.pt"),
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
-    "COMMENT": "train MLP against rule_based_agents and itself on classic scenario with 400 steps, also increasing sample size",
+    "COMMENT": "testing mlp with even larger sample size and linear epsilon decay",
     # include command line call
     "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 nn_agent_v2 rule_based_agent rule_based_agent --scenario classic --train 1 --no-gui",
     # use other agent to guide the first x episodes (our pretrain method)
@@ -86,7 +86,7 @@ reward_specs = edict({
     "INVALID_ACTION": -2,
     "BOMB_DROPPED": 1,
     "BOMB_EXPLODED": 0,
-    "CRATE_DESTROYED": 2,
+    "CRATE_DESTROYED": 4,
     "COIN_FOUND": 0,
     "COIN_COLLECTED": 5,
     "KILLED_OPPONENT": 25,

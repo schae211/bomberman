@@ -241,7 +241,7 @@ def state_to_features(game_state: dict) -> np.array:
         count = 0
         for x_i, j in enumerate([0,1,2,3,2,1,0]):
             for t in range(-j, j+1):
-                print(x_indices[x_i], t)
+                #print(x_indices[x_i], t)
                 test_pos = tuple(self_position + np.array([x_indices[x_i], t]))
                 if test_pos == (0,0):
                     continue
@@ -279,15 +279,14 @@ def state_to_features(game_state: dict) -> np.array:
         bomb_info = get_bomb_info(object_position=game_state["field"], explosion_map=explosion_map,
                                   self=game_state["self"], bomb_list=game_state["bombs"])
 
-        others_direction = get_others_direction(object_position=game_state["field"], bomb_list=game_state["bombs"],
-                                                self_position=game_state["self"][3], explosion_map=explosion_map,
-                                                others=game_state["others"])
+        #others_direction = get_others_direction(object_position=game_state["field"], bomb_list=game_state["bombs"],
+        #                                        self_position=game_state["self"][3], explosion_map=explosion_map,
+        #                                        others=game_state["others"])
 
         features = np.concatenate([safe_direction,
                                    coin_direction,
                                    crate_direction,
                                    bomb_info,
-                                   others_direction,
                                    new_features])
 
         return features[None,:]

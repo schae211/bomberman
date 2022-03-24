@@ -24,7 +24,7 @@ configs = edict({
     # storing the last x transition as replay buffer fo r training
     "MEMORY_SIZE": 12_000,
     # how many transitions should be sampled from the memory to train the model
-    "SAMPLE_SIZE": 1024,
+    "SAMPLE_SIZE": 512,
     # should we exploit symmetries to augment the training data
     "TS_AUGMENTATION": True,
     # what batch size should be used to train the model
@@ -55,7 +55,7 @@ configs = edict({
     # including some comment
     "COMMENT": "testing mlp with even larger sample size and linear epsilon decay",
     # include command line call
-    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 nn_agent_v2 rule_based_agent rule_based_agent --scenario classic --train 1 --no-gui",
+    "CALL": "python main.py play --n-rounds 500000 --agents nn_agent_v2 rule_based_agent rule_based_agent rule_based_agent --scenario classic --train 1 --no-gui",
     # use other agent to guide the first x episodes (our pretrain method)
     "PRETRAIN": False,
     # number of episodes to use pretraining

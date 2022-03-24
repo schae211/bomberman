@@ -301,7 +301,6 @@ def get_augmented_TS(FEAT_ENG, TS_X, TS_y):
                 np.rot90(TS_X, num_rot, axes=(2, 3))
             Augmented_y[num_rot*TS_X.shape[0]:(num_rot+1)*TS_X.shape[0],:] = \
                 rotated_actions(num_rot, TS_y)
-        return Augmented_X, Augmented_y
 
     elif FEAT_ENG == "standard":
         for num_rot in range(4):
@@ -309,10 +308,19 @@ def get_augmented_TS(FEAT_ENG, TS_X, TS_y):
                 rotated_standard_features(num_rot, TS_X)
             Augmented_y[num_rot*TS_X.shape[0]:(num_rot+1)*TS_X.shape[0],:] = \
                 rotated_actions(num_rot, TS_y)
-        return Augmented_X, Augmented_y
 
     elif FEAT_ENG == "channels+bomb":
-        raise NotImplementedError
+        channel_6 = TS_X[:,5,:,:].copy()
+        # we want to rotate every channel except for the 6. channels because it contains the bomb info at (0,0)
+        for num_rot in range(4):
+            Augmented_X[num_rot*TS_X.shape[0]:(num_rot+1)*TS_X.shape[0],:] = \
+                np.rot90(TS_X, num_rot, axes=(2, 3))
+            # replace entry for channel 5
+            Augmented_X[num_rot * TS_X.shape[0]:(num_rot + 1) * TS_X.shape[0], 5, :] = channel_6.copy()
+            Augmented_y[num_rot*TS_X.shape[0]:(num_rot+1)*TS_X.shape[0],:] = \
+                rotated_actions(num_rot, TS_y)
+
+    return Augmented_X, Augmented_y
 
 
 def rotated_actions(rot, TS_y):

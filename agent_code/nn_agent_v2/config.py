@@ -12,7 +12,7 @@ configs = edict({
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
     "EPSILON_DECAY": 0.9999,
     # epsilon-greedy strategy minimum epsilon: epsilon := max(0.05, epsilon * decay^(#episode))
-    "EPSILON_MIN": 0.001,
+    "EPSILON_MIN": 0.05,
     # length of epsilon-greedy decay
     "EPSILON_DECAY_LEN": 20_000,
     # epsilon decay linear or exponential
@@ -26,7 +26,7 @@ configs = edict({
     # how many transitions should be sampled from the memory to train the model
     "SAMPLE_SIZE": 1024,
     # should we exploit symmetries to augment the training data
-    "TS_AUGMENTATION": False,
+    "TS_AUGMENTATION": True,
     # what batch size should be used to train the model
     "BATCH_SIZE": 256,
     # policy: {"deterministic", "stochastic"}
@@ -38,7 +38,7 @@ configs = edict({
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
-    "LEARNING_RATE": 0.0001,
+    "LEARNING_RATE": 0.00025,
     # should we use prioritized experience replay or sample the batches randomly
     "PRIORITIZED_REPLAY": True,
     # Parameters for prioritized experience replay:

@@ -4,8 +4,8 @@ import torch.nn as nn
 
 from torch.utils.data import DataLoader, Dataset
 import numpy as np
-from agent_code.nn_agent_v2.config import configs
-from agent_code.nn_agent_v2.cnn_model import ConvMaxPool, CNN, MLP, StateValueDataset
+from .config import configs
+from .cnn_model import ConvMaxPool, CNN, MLP, StateValueDataset
 
 # Set device (either cpu or cuda)
 device = "cuda" if torch.cuda.is_available() else "cpu"

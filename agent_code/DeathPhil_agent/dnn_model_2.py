@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from torch.utils.data import DataLoader, Dataset
 import numpy as np
-from agent_code.nn_agent_v2.config import configs, SAVE_KEY, SAVE_TIME
+from .config import configs, SAVE_KEY, SAVE_TIME
 
 # Which loss function should be used
 if configs.LOSS == "huber": LOSS_FUNCTION = nn.HuberLoss()
@@ -89,7 +89,7 @@ class MLP(nn.Module):
     """
     Pytorch based implementation of a multilayer perceptron with one hidden layer
     """
-    def __init__(self, input_size=30, output_size=6, hidden_size=128):
+    def __init__(self, input_size=25, output_size=6, hidden_size=128):
         super(MLP, self).__init__()
         self.net = nn.Sequential(nn.Linear(input_size, hidden_size),
                                  nn.ReLU(),

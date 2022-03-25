@@ -5,7 +5,7 @@ import os
 import pandas as pd
 
 configs = edict({
-    # which MLP to use: {"CNN", "MLP", "CNNPlus", "MLPPlus"}
+    # which MLP to use: {"CNN", "MLP", "CNNPlus", "MLPPlus", "MLP_2"}
     "AGENT": "MLPPlus",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 1.0,
@@ -33,7 +33,7 @@ configs = edict({
     "POLICY": "deterministic",
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
-    # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb", "standard_extended"}
+    # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb", "standard_extended", "standard_strategy"}
     "FEATURE_ENGINEERING": "standard_extended",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",

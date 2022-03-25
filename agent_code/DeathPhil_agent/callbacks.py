@@ -5,12 +5,16 @@ from .cnn_model import DoubleCNNModel
 from .cnn_plus_model import DoubleCNNPlusModel
 from .pretrained_model import PretrainedModel
 from .dnn_model_extended import DoubleNNModel_Extended
+from .dnn_model_2 import DoubleNNModel_Strategy
 from .config import configs
 
 # helper lists and dictionaries for actions
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 ACTION_TRANSLATE = {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3, "WAIT": 4, "BOMB": 5}
 ACTION_TRANSLATE_REV = {val: key for key, val in ACTION_TRANSLATE.items()}
+coin_scores = {}
+coin_count = 0
+LAST_BOMB = None
 
 
 def setup(self):
@@ -31,6 +35,7 @@ def setup(self):
     if configs.AGENT == "CNN": self.model = DoubleCNNModel()
     if configs.AGENT == "CNNPlus": self.model = DoubleCNNPlusModel()
     if configs.AGENT == "MLPPlus": self.model = DoubleNNModel_Extended()
+    if configs.AGENT == "MLP_2": self.model = DoubleNNModel_Strategy()
     if configs.PRETRAIN: self.pretrained_model = PretrainedModel()
 
 
@@ -261,35 +266,201 @@ def state_to_features(game_state: dict) -> np.array:
         coin_direction = get_coin_direction(object_position=game_state["field"], coin_list=game_state["coins"],
                                             self_position=game_state["self"][3])
 
+        # 4. 1D array, len = 5:  indicating in which direction to flee from bomb if immediate danger (current, up, right, down, left),
+        # if no immediate danger/current spot is safe returns all zeros, otherwise direction
+        safe_direction = get_safe_direction(object_position=game_state["field"], explosion_map=explosion_map,
+                                            self_position=game_state["self"][3])
+
+        # 5. 1D array, len = 5, indicating whether to drop bombs to destroy crates or whether to drop bombs to kill
+        # other agents. As long as there are coins to collect the agent should destroy crates. If there are no
+        # crates left, the agent chooses the agent with lowest score and tries to kill this agent
+        drop_bomb_direction = drop_bombs(object_position=game_state["field"], self_position=game_state["self"][3],
+                                         bomb_list=game_state["bombs"], explosion_map=explosion_map,
+                                         others=game_state["others"], step=game_state["step"])
+
+        # 6. 1D array, len = 2: indicating whether bomb can be dropped and survival is possible
+        bomb_info = get_bomb_info(object_position=game_state["field"], explosion_map=explosion_map,
+                                  self=game_state["self"], bomb_list=game_state["bombs"])
+
+        # the total length of the features vector is 112
+        features = np.concatenate([safe_direction,
+                                   coin_direction,
+                                   drop_bomb_direction,
+                                   bomb_info,
+                                   new_features])
+
+        return features[None,:]
+
+
+    if configs.FEATURE_ENGINEERING == "standard_strategy":
+
+        # 1. 1D array, len = 4: indicating in which directions the agent can move (up, right, down, left)
+        awareness = get_awareness(object_position=game_state["field"], self_position=game_state["self"][3])
+
+        # 2. 1D array, len = 4:  indicating in which direction lays the closest coin determined by BFS (up, right, down, left)
+        coin_direction = get_coin_direction(object_position=game_state["field"], coin_list=game_state["coins"],
+                                            self_position=game_state["self"][3])
+
         # 2D array indicating which area is affected by exploded bombs or by bombs which are about to explode
+        # not included in the features!
         explosion_map = get_bomb_map(object_position=game_state["field"], bomb_list=game_state["bombs"],
                                      explosion_position=game_state["explosion_map"])
+
+        # 3. 1D array, len = 5:  indicating how dangerous the current field, up, right, down, left are
+        danger = get_danger(explosion_map=explosion_map, self_position=game_state["self"][3])
 
         # 4. 1D array, len = 5:  indicating in which direction to flee from bomb if immediate danger (current, up, right, down, left),
         # if no immediate danger/current spot is safe returns all zeros, otherwise direction
         safe_direction = get_safe_direction(object_position=game_state["field"], explosion_map=explosion_map,
                                             self_position=game_state["self"][3])
 
-        # 5. 1D array, len = 5:  indicating in which direction lays the most lucrative position for laying a bomb
-        # that destroys most crates penalized by the distance as determined by BFS (up, right, down, left)
-        crate_direction = get_crate_direction(object_position=game_state["field"], bomb_list=game_state["bombs"],
-                                              self_position=game_state["self"][3], explosion_map=explosion_map)
+        # 5. 1D array, len = 5, indicating whether to drop bombs to destroy crates or whether to drop bombs to kill
+        # other agents. As long as there are coins to collect the agent should destroy crates. If there are no
+        # crates left, the agent chooses the agent with lowest score and tries to kill this agent
+        drop_bomb_direction = drop_bombs(object_position=game_state["field"], self_position=game_state["self"][3],
+                                         bomb_list=game_state["bombs"], explosion_map=explosion_map,
+                                         others=game_state["others"], step=game_state["step"])
 
         # 6. 1D array, len = 2: indicating whether bomb can be dropped and survival is possible
         bomb_info = get_bomb_info(object_position=game_state["field"], explosion_map=explosion_map,
                                   self=game_state["self"], bomb_list=game_state["bombs"])
 
-        #others_direction = get_others_direction(object_position=game_state["field"], bomb_list=game_state["bombs"],
-        #                                        self_position=game_state["self"][3], explosion_map=explosion_map,
-        #                                        others=game_state["others"])
-
-        features = np.concatenate([safe_direction,
+        # the total length of the features vector is 25
+        features = np.concatenate([awareness,
+                                   danger,
+                                   safe_direction,
                                    coin_direction,
-                                   crate_direction,
-                                   bomb_info,
-                                   new_features])
+                                   drop_bomb_direction,
+                                   bomb_info
+                                   ])
 
         return features[None,:]
+
+
+def coin_bookkeeping(others, self):
+    """
+    Get sum of our own scores and scores of the other agents in this step and compare to the sum of all scores
+    in the previous step. If the difference is bigger than 4, an agent was killed, so we subtract 5 from the total score,
+    in order to only consider coin scores. The maximum coin score is 9.
+    :param others:[(str, int, bool, (int, int)] a list of tuples describing each agent's name, its current score, whether
+    a bomb can be dropped and the coordinates of the agent. The length of the list indicates the number of agents still
+    in the game.
+    :param self_score: our agent's current score
+    :return: a list of scores collected by all agents for each step, with zero if no additional score was collected by any agent in a step
+    """
+    global coin_scores, coin_count
+    for agent in others + [self]:  # don't forget to append self
+        if (agent[1] - coin_scores[agent[0]]) % 5 == 1:  # check whether score difference contains coin
+            coin_count += 1
+        coin_scores[agent[0]] = agent[1]  # update dictionary
+
+
+def drop_bombs(object_position, self_position, bomb_list, explosion_map, others , step):
+    """
+    As long as there are coins left to collect the agent should destroy crates to collect coins. If there are no
+    coins left to collect, the agent should find the agent with the lowest score and try to kill it.
+    :param object_position: crate, stone wall, free field
+    :param self_position: our agent's current position
+    :param bomb_list: list of tuples of coordinates and countdowns for all active bombs
+    :param explosion map
+    :param step: current step
+    :param others:[(str, int, bool, (int, int)] a list of tuples describing each agent's name, its current score, whether
+    a bomb can be dropped and the coordinates of the agent. The length of the list indicates the number of agents still
+    in the game.    :return: a list of scores collected by all agents for each step, with zero if no additional score was collected by any agent in a step
+    """
+    global coin_count
+    # if the coin score is below 9, there are still coins left to collect, so we will focus on destroying crates
+    if coin_count < 9:
+        crate_agent_info = get_crate_direction(object_position=object_position, bomb_list=bomb_list,
+                                              self_position=self_position, explosion_map=explosion_map)
+    # if the coin score is >= 9, then there are no coins left to collect, so we will focus on killing agents
+    else:
+        # search for agent with lowest score, we will try to kill this agent
+        scores = np.zeros(len(others))
+        for i in range(len(others)):
+            scores[i] = others[i][1]
+        # save name of agent x with lowest score
+        agent_name = others[np.argmin(scores)][0]
+        # find position of agent x, follow him and drop bombs under certain conditions
+        crate_agent_info = get_agent_direction(object_position, bomb_list, self_position, explosion_map, agent_name,
+                             others, step)
+    return crate_agent_info
+
+
+def agent_bfs(object_position, bomb_list, self_position, explosion_map, agent_name, others , step ):#, max_dist=16):
+    global LAST_BOMB
+    # get position of other agent
+    for i in range(len(others)):
+        if others[i][0] == agent_name:
+            agent_index = i
+    agentx_position = others[agent_index][3]
+
+    q = Queue()
+    explored = set()
+    # add start to the Queue
+    q.put(Node(position=self_position, parent_position=None, move=None))
+    # loop over the queue as long as it is not empty
+    while True:
+        if q.empty(): return None
+        # always get first element
+        node = q.get()
+
+        # found position of agent x
+        if node.position == agentx_position and \
+                check_survival(object_position, bomb_list, node.position, explosion_map):
+            # compute distance to current position
+            dist_to_self = np.abs(np.array(node.position) - np.array(self_position)).sum()
+            # if we are farther than 3 steps away we want to move towards the other agent, but not drop a bomb
+            actions, cells = [], []
+            if dist_to_self >= 3:
+                # backtracing
+                while node.parent_position is not None:
+                    actions.append(node.move)
+                    cells.append(node.position)
+                    node = node.parent_position
+                actions.reverse()
+                cells.reverse()
+                return actions, cells
+            # if we are within 3 steps of the agent we want to consider dropping a bomb depending on the other
+            # agents escape directions
+            if dist_to_self < 3:
+                # get possible directions in which the other agent can move
+                directions_agent_x = get_awareness(object_position, agentx_position)
+                #neighbors_agentx = get_neighbors(object_position, agentx_position)
+                #directions_agentx = get_safe_direction(object_position, explosion_map, agentx_position)
+
+                # if the other agent has only one direction to escape, we want to drop a bomb
+                if np.sum(directions_agent_x) == 1:
+                    return actions, cells
+                if np.sum(directions_agent_x) == 2:
+                    return actions, cells
+        explored.add(node.position)
+        neighbors = get_neighbors(object_position, node.position)
+        for action, neighbor in zip(neighbors["actions"], neighbors["neighbors"]):
+            if neighbor not in explored and not q.contains_state(neighbor):
+                child = Node(position=neighbor, parent_position=node, move=action)
+                q.put(child)
+
+
+
+def get_agent_direction(object_position, bomb_list, self_position, explosion_map, agent_name,
+                         others , step):
+    agent_direction = np.zeros(5)
+    agent_info = agent_bfs(object_position, bomb_list, self_position, explosion_map, agent_name, others, step )
+
+    if agent_info is not None:  # None is returned if destruction score was negative for all considered positions
+        agent_direction[0] = 1              # indicating that a target was found
+        if agent_info == ([], []):          # if current position, keep all directional indicators 0
+            pass
+        elif agent_info[0][0] == "up":
+            agent_direction[1] = 1
+        elif agent_info[0][0] == "right":
+            agent_direction[2] = 1
+        elif agent_info[0][0] == "down":
+            agent_direction[3] = 1
+        elif agent_info[0][0] == "left":
+            agent_direction[4] = 1
+    return agent_direction
 
 
 def state_to_features_pretrain(game_state: dict) -> np.array:

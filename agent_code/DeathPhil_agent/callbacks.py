@@ -260,7 +260,7 @@ def state_to_features(game_state: dict) -> np.array:
                 count += 1
 
         # flatten new features and concatenate to other vector
-        new_features = new_features.reshape(-1)
+        reception = new_features.reshape(-1)
 
         # 2. 1D array, len = 4:  indicating in which direction lays the closest coin determined by BFS (up, right, down, left)
         coin_direction = get_coin_direction(object_position=game_state["field"], coin_list=game_state["coins"],
@@ -287,7 +287,7 @@ def state_to_features(game_state: dict) -> np.array:
                                    coin_direction,
                                    drop_bomb_direction,
                                    bomb_info,
-                                   new_features])
+                                   reception])
 
         return features[None,:]
 

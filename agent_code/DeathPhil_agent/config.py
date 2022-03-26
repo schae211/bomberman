@@ -12,9 +12,9 @@ configs = edict({
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
     "EPSILON_DECAY": 0.9999,
     # epsilon-greedy strategy minimum epsilon: epsilon := max(0.05, epsilon * decay^(#episode))
-    "EPSILON_MIN": 0.05,
+    "EPSILON_MIN": 0.001,
     # length of epsilon-greedy decay
-    "EPSILON_DECAY_LEN": 20_000,
+    "EPSILON_DECAY_LEN": 30_000,
     # epsilon decay linear or exponential
     "EPSILON_DECAY_LINEAR": True,
     # discount factor gamma, which discount future rewards

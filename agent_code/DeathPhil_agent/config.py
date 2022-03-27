@@ -14,7 +14,7 @@ configs = edict({
     # epsilon-greedy strategy minimum epsilon: epsilon := max(0.05, epsilon * decay^(#episode))
     "EPSILON_MIN": 0.001,
     # length of epsilon-greedy decay
-    "EPSILON_DECAY_LEN": 40_000,
+    "EPSILON_DECAY_LEN": 20_000,
     # epsilon decay linear or exponential
     "EPSILON_DECAY_LINEAR": True,
     # discount factor gamma, which discount future rewards
@@ -82,7 +82,7 @@ reward_specs = edict({
     "MOVED_UP": 0,
     "MOVED_DOWN": 0,
     "MOVED_LEFT": 0,
-    "WAITED": 0,
+    "WAITED": -0.5,
     "INVALID_ACTION": -2,
     "BOMB_DROPPED": 0,
     "BOMB_EXPLODED": 0,

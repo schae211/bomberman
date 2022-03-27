@@ -6,7 +6,7 @@ import pandas as pd
 
 configs = edict({
     # which MLP to use: {"CNN", "MLP", "CNNPlus", "MLPPlus", "MLP_2"}
-    "AGENT": "MLPPlus",
+    "AGENT": "MLP_2",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 1.0,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
@@ -34,11 +34,11 @@ configs = edict({
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb", "standard_extended", "standard_strategy"}
-    "FEATURE_ENGINEERING": "standard_extended",
+    "FEATURE_ENGINEERING": "standard_strategy",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
-    "LEARNING_RATE": 0.00025,
+    "LEARNING_RATE": 0.00001,
     # should we use prioritized experience replay or sample the batches randomly
     "PRIORITIZED_REPLAY": True,
     # Parameters for prioritized experience replay:
@@ -49,7 +49,7 @@ configs = edict({
     # whether to load a model
     "LOAD": True,
     # where to load the model
-    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/pretrain_models/26-03-2022-10-01_MLPPlus_1.0_0.9999_0.001_0.99_1_12000_256_deterministic_standard_extended_huber_0.00025_True_10_model.pt"),
+    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/pretrain_models/26-03-2022-19-11_MLP_2_1.0_0.9999_0.001_0.99_1_12000_256_deterministic_standard_strategy_huber_0.00025_True_10_model.pt"),
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
@@ -82,7 +82,7 @@ reward_specs = edict({
     "MOVED_UP": 0,
     "MOVED_DOWN": 0,
     "MOVED_LEFT": 0,
-    "WAITED": 0,
+    "WAITED": -0.5,
     "INVALID_ACTION": -2,
     "BOMB_DROPPED": 0,
     "BOMB_EXPLODED": 0,

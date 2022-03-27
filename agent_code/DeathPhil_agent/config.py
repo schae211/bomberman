@@ -6,7 +6,7 @@ import pandas as pd
 
 configs = edict({
     # which MLP to use: {"CNN", "MLP", "CNNPlus", "MLPPlus", "MLP_2"}
-    "AGENT": "MLP_2",
+    "AGENT": "MLPPlus",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 1.0,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
@@ -34,7 +34,7 @@ configs = edict({
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb", "standard_extended", "standard_strategy"}
-    "FEATURE_ENGINEERING": "standard_strategy",
+    "FEATURE_ENGINEERING": "standard_extended",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
@@ -49,7 +49,7 @@ configs = edict({
     # whether to load a model
     "LOAD": True,
     # where to load the model
-    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/pretrain_models/25-03-2022-16-41_MLP_2_1.0_0.9999_0.05_0.99_1_12000_256_deterministic_standard_strategy_huber_0.00025_True_10_model.pt"),
+    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/pretrain_models/26-03-2022-10-01_MLPPlus_1.0_0.9999_0.001_0.99_1_12000_256_deterministic_standard_extended_huber_0.00025_True_10_model.pt"),
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
@@ -61,7 +61,7 @@ configs = edict({
     # number of episodes to use pretraining
     "PRETRAIN_LEN": 0,
     # location of the save pretrain agent model
-    "PRETRAIN_LOC":  os.path.expanduser("~/bomberman_stats/pretrain_models/20-03-2022-17-11_MLP_1.0_0.9999_0.001_0.8_10_10000_256_deterministic_standard_huber_0.0001_True_10_model.pt"),
+    "PRETRAIN_LOC":  os.path.expanduser("~/bomberman_stats/pretrain_models/26-03-2022-10-01_MLPPlus_1.0_0.9999_0.001_0.99_1_12000_256_deterministic_standard_extended_huber_0.00025_True_10_model.pt"),
     # pretrain feature engineering: {"channels", "standard", "channels+bomb"}
     "PRETRAIN_FEATURES": "standard",
     # fraction of random moves performed by pretrained agent (so no perfect performance)
@@ -82,14 +82,14 @@ reward_specs = edict({
     "MOVED_UP": 0,
     "MOVED_DOWN": 0,
     "MOVED_LEFT": 0,
-    "WAITED": -1,
+    "WAITED": 0,
     "INVALID_ACTION": -2,
     "BOMB_DROPPED": 0,
     "BOMB_EXPLODED": 0,
     "CRATE_DESTROYED": 1,
     "COIN_FOUND": 0,
     "COIN_COLLECTED": 5,
-    "KILLED_OPPONENT": 50,
+    "KILLED_OPPONENT": 25,
     "KILLED_SELF": 0,  # setting to 0 because also included in GOT_KILLED
     "GOT_KILLED": -25,
     "OPPONENT_ELIMINATED": 0,

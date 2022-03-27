@@ -379,21 +379,20 @@ def drop_bombs(object_position, self_position, bomb_list, explosion_map, others)
     global coin_count
     # if the coin score is below 9, there are still coins left to collect, so we will focus on destroying crates
     if coin_count < 9:
-        crate_agent_info = get_crate_direction(object_position=object_position, bomb_list=bomb_list,
-                                              self_position=self_position, explosion_map=explosion_map)
+        return get_crate_direction(object_position=object_position, bomb_list=bomb_list,
+                                   self_position=self_position, explosion_map=explosion_map)
     # if the coin score is >= 9, then there are no coins left to collect, so we will focus on killing agents
     else:
         # search for agent with the lowest score, we will try to kill this agent
-        scores = np.zeros(len(others))
-        for i in range(len(others)):
-            scores[i] = others[i][1]
-        # save name of agent x with the lowest score
-        agent_name = others[np.argmin(scores)][0]
-        # find position of agent x, follow him and drop bombs under certain conditions
-        crate_agent_info = get_agent_direction(object_position, bomb_list, self_position, explosion_map, agent_name,
-                             others)
-    return crate_agent_info
-
+        scores = np.array([other[1] for other in others])
+        if len(scores) == 0:
+            return np.zeros(5)
+        else:
+            # save name of agent x with the lowest score
+            agent_name = others[np.argmin(scores)][0]
+            # find position of agent x, follow him and drop bombs under certain conditions
+            return get_agent_direction(object_position, bomb_list, self_position, explosion_map, agent_name,
+                                       others)
 
 def agent_bfs(object_position, bomb_list, self_position, explosion_map, agent_name, others):#, max_dist=16):
     global LAST_BOMB

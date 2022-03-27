@@ -21,6 +21,10 @@ SCENARIOS = {
     "classic": {
         "CRATE_DENSITY": 0.75,
         "COIN_COUNT": 9
+    },
+    "no_crates": {
+        "CRATE_DENSITY": 0,
+        "COIN_COUNT": 9
     }
     # Feel free to add more game modes and properties
     # game is created in environment.py -> BombeRLeWorld -> build_arena()
@@ -28,8 +32,8 @@ SCENARIOS = {
 MAX_AGENTS = 4
 
 # TODO: tweak here
-MAX_STEPS = 200
-#MAX_STEPS = 400
+# MAX_STEPS = 200
+MAX_STEPS = 400
 
 # GUI properties
 GRID_SIZE = 30

@@ -256,16 +256,16 @@ def state_to_features(game_state: dict) -> np.array:
             for t in range(-j, j+1):
                 #print(x_indices[x_i], t)
                 test_pos = tuple(self_position + np.array([x_indices[x_i], t]))
-                if test_pos == (0,0):
-                    continue
-                try:
-                    new_features[0, count] = object_map[test_pos]
-                    new_features[1, count] = coin_map[test_pos]
-                    new_features[2, count] = explosion_map[test_pos]
-                    new_features[3, count] = other_agents[test_pos]
-                except IndexError:
-                    pass
-                count += 1
+                if test_pos != tuple(self_position):
+                    # if no all indices are positive or larger than 16
+                    if any(np.array(test_pos) > 16) or any(np.array(test_pos) < 0):
+                        count += 1
+                    else:
+                        new_features[0, count] = object_map[test_pos]
+                        new_features[1, count] = coin_map[test_pos]
+                        new_features[2, count] = explosion_map[test_pos]
+                        new_features[3, count] = other_agents[test_pos]
+                        count += 1
 
         # flatten new features and concatenate to other vector
         reception = new_features.reshape(-1)

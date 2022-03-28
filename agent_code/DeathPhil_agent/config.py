@@ -14,7 +14,7 @@ configs = edict({
     # epsilon-greedy strategy minimum epsilon: epsilon := max(0.05, epsilon * decay^(#episode))
     "EPSILON_MIN": 0.001,
     # length of epsilon-greedy decay
-    "EPSILON_DECAY_LEN": 20_000,
+    "EPSILON_DECAY_LEN": 10_000,
     # epsilon decay linear or exponential
     "EPSILON_DECAY_LINEAR": True,
     # discount factor gamma, which discount future rewards
@@ -47,9 +47,9 @@ configs = edict({
     # how often to update the target network
     "UPDATE_FREQ": 10,
     # whether to load a model
-    "LOAD": False,
+    "LOAD": True,
     # where to load the model
-    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/pretrain_models/27-03-2022-20-28_MLPPlus_1.0_0.9999_0.001_0.99_1_12000_256_deterministic_standard_extended_huber_0.00025_True_10_model.pt"),
+    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/pretrain_models/28-03-2022-08-31_MLPPlus_1.0_0.9999_0.001_0.99_1_12000_256_deterministic_standard_extended_huber_0.00025_True_10_model.pt"),
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
@@ -82,11 +82,11 @@ reward_specs = edict({
     "MOVED_UP": 0,
     "MOVED_DOWN": 0,
     "MOVED_LEFT": 0,
-    "WAITED": -0.5,
+    "WAITED": -0.25,
     "INVALID_ACTION": -2,
     "BOMB_DROPPED": 0,
     "BOMB_EXPLODED": 0,
-    "CRATE_DESTROYED": 1,
+    "CRATE_DESTROYED": 0.25,
     "COIN_FOUND": 0,
     "COIN_COLLECTED": 5,
     "KILLED_OPPONENT": 25,

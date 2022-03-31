@@ -1,9 +1,6 @@
-
-import numpy as np
-import matplotlib.pyplot as plt
 from items import Coin
 from debug_utils import *
-from agent_code.nn_agent_v2.callbacks import *
+from agent_code.OLD_AGENTS.nn_agent_v2.callbacks import *
 
 
 def build_arena(COLS, ROWS, CRATE_DENSITY, COIN_COUNT, SEED):

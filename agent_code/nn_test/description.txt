@@ -1,5 +1,0 @@
-
-Details:
-- This agent is going to be trained using temporal difference Q-learning using Gradient Boosted Trees
-- Idea is based on this blog post: https://towardsdatascience.com/reinforcement-learning-q-learning-with-decision-trees-ecb1215d9131
--

@@ -49,7 +49,7 @@ configs = edict({
     # whether to load a model
     "LOAD": True,
     # where to load the model
-    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/25-03-2022-16-41_MLP_2_1.0_0.9999_0.05_0.99_1_12000_256_deterministic_standard_strategy_huber_0.00025_True_10_model.pt"),
+    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/pretrain_models/25-03-2022-16-41_MLP_2_1.0_0.9999_0.05_0.99_1_12000_256_deterministic_standard_strategy_huber_0.00025_True_10_model.pt"),
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment

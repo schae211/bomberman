@@ -49,7 +49,7 @@ configs = edict({
     # whether to load a model
     "LOAD": True,
     # where to load the model
-    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/pretrain_models/25-03-2022-16-41_MLP_2_1.0_0.9999_0.05_0.99_1_12000_256_deterministic_standard_strategy_huber_0.00025_True_10_model.pt"),
+    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/pretrain_models/01-04-2022-08-25_MLP_2_1.0_0.9999_0.001_0.9_1_12000_256_deterministic_standard_strategy_huber_0.0001_True_10_model.pt"),
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
@@ -71,7 +71,7 @@ configs = edict({
 })
 
 auxiliary_rewards = edict({
-    "MOVE_IN_CIRCLES": False,
+    "MOVE_IN_CIRCLES": True,
     "MOVE_TO_OR_FROM_COIN": False,
     "STAY_OR_ESCAPE_BOMB": False
 })
@@ -97,7 +97,7 @@ reward_specs = edict({
     # auxiliary events to reward shaping
     "MOVE_TO_COIN": 1,
     "MOVE_FROM_COIN": -1,
-    "MOVE_IN_CIRCLES": -1,
+    "MOVE_IN_CIRCLES": -0.25,
     "STAY_IN_BOMB": -1,
     "ESCAPE_FROM_BOMB": 1
 })

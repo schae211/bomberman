@@ -96,7 +96,7 @@ class ConvMaxPool(nn.Module):
                               padding=padding)
         self.activation = nn.ReLU()
         if max_pooling:
-            self.max_pooling = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2), padding=1)
+                self.max_pooling = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2), padding=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.conv(x)

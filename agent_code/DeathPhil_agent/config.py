@@ -71,7 +71,7 @@ configs = edict({
 })
 
 auxiliary_rewards = edict({
-    "MOVE_IN_CIRCLES": True,
+    "MOVE_IN_CIRCLES": False,
     "MOVE_TO_OR_FROM_COIN": False,
     "STAY_OR_ESCAPE_BOMB": False
 })

@@ -558,7 +558,7 @@ def state_to_features_pretrain(game_state: dict) -> np.array:
         return features[None,:]
 
 
-    if configs.FEATURE_ENGINEERING == "channels+bomb":
+    if configs.PRETRAIN_FEATURES == "channels+bomb":
 
         object_map = game_state["field"]
 
@@ -587,6 +587,74 @@ def state_to_features_pretrain(game_state: dict) -> np.array:
         # return the channels and whether bomb action is possible
         return stacked_channels[None,:]
 
+    if configs.PRETRAIN_FEATURES == "standard_extended":
+
+        object_map = game_state["field"]
+
+        coin_map = np.zeros_like(game_state["field"])
+        for cx, cy in game_state["coins"]: coin_map[cx, cy] = 1
+
+        explosion_map = get_bomb_map(object_position=game_state["field"], bomb_list=game_state["bombs"],
+                                     explosion_position=game_state["explosion_map"])
+
+        other_agents = np.zeros_like(game_state["field"])
+        for (_, _, _, (cx, cy)) in game_state["others"]: other_agents[cx, cy] = 1
+
+        # now extract the fields surrounding our agent
+        self_position = np.array(game_state["self"][3])
+
+        new_features = np.zeros((4, 24))
+        # set per default everything to walls
+        new_features[0,:] = -1
+        # go 3 steps into each direction (via try and except?)
+        x_indices = [-3, -2, -1, 0, 1, 2, 3]
+        count = 0
+        for x_i, j in enumerate([0,1,2,3,2,1,0]):
+            for t in range(-j, j+1):
+                #print(x_indices[x_i], t)
+                test_pos = tuple(self_position + np.array([x_indices[x_i], t]))
+                if test_pos != tuple(self_position):
+                    # if no all indices are positive or larger than 16
+                    if any(np.array(test_pos) > 16) or any(np.array(test_pos) < 0):
+                        count += 1
+                    else:
+                        new_features[0, count] = object_map[test_pos]
+                        new_features[1, count] = coin_map[test_pos]
+                        new_features[2, count] = explosion_map[test_pos]
+                        new_features[3, count] = other_agents[test_pos]
+                        count += 1
+
+        # flatten new features and concatenate to other vector
+        reception = new_features.reshape(-1)
+
+        # 2. 1D array, len = 4:  indicating in which direction lays the closest coin determined by BFS (up, right, down, left)
+        coin_direction = get_coin_direction(object_position=game_state["field"], coin_list=game_state["coins"],
+                                            self_position=game_state["self"][3])
+
+        # 4. 1D array, len = 5:  indicating in which direction to flee from bomb if immediate danger (current, up, right, down, left),
+        # if no immediate danger/current spot is safe returns all zeros, otherwise direction
+        safe_direction = get_safe_direction(object_position=game_state["field"], explosion_map=explosion_map,
+                                            self_position=game_state["self"][3])
+
+        # 5. 1D array, len = 5, indicating whether to drop bombs to destroy crates or whether to drop bombs to kill
+        # other agents. As long as there are coins to collect the agent should destroy crates. If there are no
+        # crates left, the agent chooses the agent with lowest score and tries to kill this agent
+        drop_bomb_direction = drop_bombs(object_position=game_state["field"], self_position=game_state["self"][3],
+                                         bomb_list=game_state["bombs"], explosion_map=explosion_map,
+                                         others=game_state["others"])
+
+        # 6. 1D array, len = 2: indicating whether bomb can be dropped and survival is possible
+        bomb_info = get_bomb_info(object_position=game_state["field"], explosion_map=explosion_map,
+                                  self=game_state["self"], bomb_list=game_state["bombs"])
+
+        # the total length of the features vector is 112
+        features = np.concatenate([safe_direction,
+                                   coin_direction,
+                                   drop_bomb_direction,
+                                   bomb_info,
+                                   reception])
+
+        return features[None,:]
 
 # define simple node class used for BFS
 class Node(object):

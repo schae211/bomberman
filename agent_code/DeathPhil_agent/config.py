@@ -6,7 +6,7 @@ import pandas as pd
 
 configs = edict({
     # which MLP to use: {"CNN", "MLP", "CNNPlus", "MLPPlus", "MLP_2"}
-    "AGENT": "MLP_2",
+    "AGENT": "CNNPlus",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 1.0,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
@@ -34,7 +34,7 @@ configs = edict({
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb", "standard_extended", "standard_strategy"}
-    "FEATURE_ENGINEERING": "standard_strategy",
+    "FEATURE_ENGINEERING": "channels+bomb",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
@@ -49,7 +49,7 @@ configs = edict({
     # whether to load a model
     "LOAD": True,
     # where to load the model
-    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/pretrain_models/01-04-2022-08-25_MLP_2_1.0_0.9999_0.001_0.9_1_12000_256_deterministic_standard_strategy_huber_0.0001_True_10_model.pt"),
+    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/pretrain_models/24-03-2022-09-15_CNNPlus_1.0_0.9999_0.001_0.9_1_12000_256_deterministic_channels+bomb_huber_0.0001_True_10_model.pt"),
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
@@ -57,17 +57,17 @@ configs = edict({
     # include command line call
     "CALL": "python main.py play --n-rounds 500000 --agents DeathPhil_agent rule_based_agent rule_based_agent rule_based_agent --scenario classic --train 1 --no-gui",
     # use other agent to guide the first x episodes (our pretrain method)
-    "PRETRAIN": False,
+    "PRETRAIN": True,
     # number of episodes to use pretraining
-    "PRETRAIN_LEN": 0,
+    "PRETRAIN_LEN": 10_000,
     # location of the save pretrain agent model
-    "PRETRAIN_LOC":  os.path.expanduser("~/bomberman_stats/pretrain_models/26-03-2022-10-01_MLPPlus_1.0_0.9999_0.001_0.99_1_12000_256_deterministic_standard_extended_huber_0.00025_True_10_model.pt"),
+    "PRETRAIN_LOC":  os.path.expanduser("~/bomberman_stats/pretrain_models/29-03-2022-08-31_MLPPlus_1.0_0.9999_0.001_0.99_1_12000_256_deterministic_standard_extended_huber_0.00025_True_10_model.pt"),
     # pretrain feature engineering: {"channels", "standard", "channels+bomb"}
-    "PRETRAIN_FEATURES": "standard",
+    "PRETRAIN_FEATURES": "standard_extended",
     # fraction of random moves performed by pretrained agent (so no perfect performance)
     "PRETRAIN_RANDOM": 1.0,
     # decay of the random playing rate for pretraining
-    "PRETRAIN_RANDOM_DECAY": 0.9999
+    "PRETRAIN_RANDOM_DECAY": 0.999
 })
 
 auxiliary_rewards = edict({

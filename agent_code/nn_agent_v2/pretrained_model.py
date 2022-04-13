@@ -2,9 +2,8 @@
 import torch
 import torch.nn as nn
 
-from torch.utils.data import DataLoader, Dataset
 import numpy as np
-from agent_code.OLD_AGENTS.nn_agent_v2.config import configs
+from agent_code.nn_agent_v2.config import configs
 
 # Set device (either cpu or cuda)
 device = "cuda" if torch.cuda.is_available() else "cpu"

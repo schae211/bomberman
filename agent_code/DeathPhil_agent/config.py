@@ -6,7 +6,7 @@ import pandas as pd
 
 configs = edict({
     # which MLP to use: {"CNN", "MLP", "CNNPlus", "MLPPlus", "MLP_2"}
-    "AGENT": "CNNPlus",
+    "AGENT": "MLPPlus",
     # epsilon-greedy strategy epsilon parameter = probability to do random move
     "EPSILON": 1.0,
     # epsilon-greedy strategy decay parameter: epsilon * decay^(#episode)
@@ -14,7 +14,7 @@ configs = edict({
     # epsilon-greedy strategy minimum epsilon: epsilon := max(0.05, epsilon * decay^(#episode))
     "EPSILON_MIN": 0.001,
     # length of epsilon-greedy decay
-    "EPSILON_DECAY_LEN": 20_000,
+    "EPSILON_DECAY_LEN": 100_000,
     # epsilon decay linear or exponential
     "EPSILON_DECAY_LINEAR": True,
     # discount factor gamma, which discount future rewards
@@ -34,7 +34,7 @@ configs = edict({
     # default probabilities for the actions [up, right, down, left, wait, bomb]
     "DEFAULT_PROBS": [.2, .2, .2, .2, .1, .1],
     # determines the behavior of the states_to_features function: {"channels", "standard", "channels+bomb", "standard_extended", "standard_strategy"}
-    "FEATURE_ENGINEERING": "channels+bomb",
+    "FEATURE_ENGINEERING": "standard_extended",
     # what loss to use for nn: {mse, huber}
     "LOSS": "huber",
     # learning rate used for gradient descent in nn
@@ -47,19 +47,19 @@ configs = edict({
     # how often to update the target network
     "UPDATE_FREQ": 10,
     # whether to load a model
-    "LOAD": False,
+    "LOAD": True,
     # where to load the model
-    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/pretrain_models/24-03-2022-09-15_CNNPlus_1.0_0.9999_0.001_0.9_1_12000_256_deterministic_channels+bomb_huber_0.0001_True_10_model.pt"),
+    "LOAD_PATH": os.path.expanduser("~/bomberman_stats/29-03-2022-08-31_MLPPlus_1.0_0.9999_0.001_0.99_1_12000_256_deterministic_standard_extended_huber_0.00025_True_10_model.pt"),
     # where to store and load the model,
     "MODEL_LOC": os.path.expanduser("~/bomberman_stats"),
     # including some comment
     "COMMENT": "testing old mlp with the new feature",
     # include command line call
-    "CALL": "python main.py play --n-rounds 500000 --agents DeathPhil_agent rule_based_agent rule_based_agent rule_based_agent --scenario classic --train 1 --no-gui",
+    "CALL": "python main.py play --n-rounds 1000000 --agents DeathPhil_agent rule_based_agent rule_based_agent rule_based_agent --scenario classic --train 1 --no-gui",
     # use other agent to guide the first x episodes (our pretrain method)
-    "PRETRAIN": True,
+    "PRETRAIN": False,
     # number of episodes to use pretraining
-    "PRETRAIN_LEN": 10_000,
+    "PRETRAIN_LEN": 0,
     # location of the save pretrain agent model
     "PRETRAIN_LOC":  os.path.expanduser("~/bomberman_stats/pretrain_models/29-03-2022-08-31_MLPPlus_1.0_0.9999_0.001_0.99_1_12000_256_deterministic_standard_extended_huber_0.00025_True_10_model.pt"),
     # pretrain feature engineering: {"channels", "standard", "channels+bomb"}

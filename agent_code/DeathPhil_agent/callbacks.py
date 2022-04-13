@@ -1,4 +1,3 @@
-import os
 import numpy as np
 from .dnn_model import DoubleNNModel
 from .cnn_model import DoubleCNNModel
